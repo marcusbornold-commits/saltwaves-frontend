@@ -1,0 +1,122 @@
+/* sections-v2.css — styles for tools suite, testimonials, pricing toggle, FAQ, blog, CTA banner, footer columns */
+
+/* ---------- Tools suite ---------- */
+.tools-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 56px; }
+@media (max-width: 800px) { .tools-grid { grid-template-columns: 1fr; } }
+.tool-card {
+  position: relative;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 18px;
+  padding: 30px; display: flex; flex-direction: column; gap: 10px;
+  text-decoration: none; color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+a.tool-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(26, 26, 26, 0.08); border-color: var(--orange); }
+.tool-card.flagship { grid-column: 1 / -1; border-color: var(--orange); border-width: 2px; }
+.tool-card.soon { opacity: 0.55; }
+.tool-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.tool-name { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; }
+.tool-card p { color: var(--ink-soft); font-size: 15.5px; max-width: 52ch; }
+.tool-tag {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em;
+  color: var(--orange);
+}
+.tool-badge {
+  flex: none; font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; color: var(--ink-soft);
+}
+.tool-badge.live { border-color: rgba(255, 98, 0, 0.45); color: var(--orange); }
+.tool-arrow { color: var(--orange); flex: none; transition: transform 0.18s ease; }
+a.tool-card:hover .tool-arrow { transform: translateX(4px); }
+
+/* ---------- Testimonials ---------- */
+.testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 56px; }
+@media (max-width: 860px) { .testi-grid { grid-template-columns: 1fr; } }
+.testi-card {
+  background: var(--card-dark); border: 1px dashed var(--line-dark); border-radius: 16px;
+  padding: 28px; display: flex; flex-direction: column; gap: 18px;
+}
+.testi-quote { font-size: 16px; line-height: 1.55; color: var(--paper-soft); font-style: italic; }
+.testi-who { display: flex; align-items: center; gap: 12px; }
+.testi-avatar {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  border: 1.5px dashed rgba(241, 237, 232, 0.35);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 10px; color: var(--paper-soft);
+}
+
+/* ---------- Pricing toggle ---------- */
+.pricing-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.bill-toggle { display: inline-flex; border: 1.5px solid var(--line); border-radius: 999px; padding: 4px; gap: 4px; background: var(--card); }
+.bill-toggle button {
+  border: none; background: transparent; border-radius: 999px; padding: 9px 20px;
+  font-weight: 700; font-size: 14px; color: var(--ink-soft);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.bill-toggle button.on { background: var(--ink); color: var(--paper); }
+.save-pill { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.05em; color: var(--orange); margin-left: 8px; }
+
+/* ---------- FAQ ---------- */
+.faq-list { margin-top: 48px; border-top: 1.5px solid var(--line); max-width: 860px; }
+.faq-item { border-bottom: 1.5px solid var(--line); }
+.faq-q {
+  width: 100%; background: none; border: none; text-align: left;
+  display: flex; justify-content: space-between; align-items: center; gap: 18px;
+  padding: 24px 0; font-weight: 700; font-size: 19px; letter-spacing: -0.01em; color: inherit;
+  transition: color 0.15s ease;
+}
+.faq-q:hover { color: var(--orange); }
+.faq-icon { flex: none; color: var(--orange); transition: transform 0.25s ease; }
+.faq-item.open .faq-icon { transform: rotate(45deg); }
+.faq-a { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease; }
+.faq-item.open .faq-a { grid-template-rows: 1fr; }
+.faq-a > div { overflow: hidden; }
+.faq-a p { padding: 0 0 24px; color: var(--ink-soft); max-width: 62ch; font-size: 16.5px; }
+
+/* ---------- Blog teaser ---------- */
+.blog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 56px; }
+@media (max-width: 860px) { .blog-grid { grid-template-columns: 1fr; } }
+.blog-card {
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 16px;
+  padding: 28px; display: flex; flex-direction: column; gap: 12px;
+  opacity: 0.6;
+}
+.blog-card h3 { font-size: 20px; line-height: 1.25; }
+.blog-card p { color: var(--ink-soft); font-size: 15px; flex: 1; }
+.blog-more { font-weight: 700; font-size: 15px; color: var(--ink-soft); text-decoration: none; pointer-events: none; }
+.blog-badge {
+  align-self: flex-start; font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; color: var(--ink-soft);
+}
+
+/* ---------- Pricing: coming-soon features ---------- */
+.price-list li.soon { color: rgba(26, 26, 26, 0.38); }
+.price-list li.soon::before { color: rgba(255, 98, 0, 0.45); }
+.soon-badge {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  border: 1px solid rgba(26, 26, 26, 0.18); border-radius: 999px; padding: 2px 8px;
+  color: rgba(26, 26, 26, 0.45); margin-left: 4px; white-space: nowrap;
+}
+
+/* ---------- Final CTA banner ---------- */
+.cta-banner { background: var(--orange); color: var(--ink); text-align: center; }
+.cta-banner h2 { font-size: clamp(2.4rem, 5.4vw, 4rem); margin-bottom: 30px; max-width: 18ch; margin-left: auto; margin-right: auto; }
+.btn-ink { background: var(--ink); color: #f1ede8; }
+.btn-ink:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(26, 26, 26, 0.35); }
+.cta-banner .microcopy { color: rgba(26, 26, 26, 0.66); margin-top: 16px; display: block; }
+
+/* ---------- Footer v2 ---------- */
+.footer-cols { display: flex; gap: clamp(32px, 5vw, 80px); flex-wrap: wrap; }
+.footer-col h4 {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 16px;
+}
+.footer-col ul { list-style: none; display: grid; gap: 10px; }
+.footer-col a { text-decoration: none; font-size: 15px; font-weight: 500; opacity: 0.7; transition: opacity 0.15s, color 0.15s; }
+.footer-col a:hover { opacity: 1; color: var(--orange); }
+.footer-social { display: flex; gap: 14px; margin-top: 22px; }
+.footer-social a {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line-dark);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--paper);
+  opacity: 0.75; transition: opacity 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+}
+.footer-social a:hover { opacity: 1; border-color: var(--orange); color: var(--orange); transform: translateY(-2px); }
