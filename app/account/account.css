@@ -1,0 +1,148 @@
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap");
+
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f1ede8;
+  color: #1a1a1a;
+  padding: 20px;
+  font-family: "Archivo", sans-serif;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.login-title {
+  font-family: "Clash Display", sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  margin-bottom: 6px;
+  color: #1a1a1a;
+}
+
+.login-sub {
+  font-size: 15px;
+  color: rgba(26, 26, 26, 0.62);
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.btn-google {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1.5px solid rgba(26, 26, 26, 0.14);
+  border-radius: 10px;
+  padding: 14px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.btn-google:hover {
+  border-color: rgba(26, 26, 26, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-primary-full {
+  display: block;
+  width: 100%;
+  background: #ff6200;
+  color: #1a1a1a;
+  border: none;
+  border-radius: 10px;
+  padding: 15px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  font-family: inherit;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn-primary-full:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(255, 98, 0, 0.35);
+}
+
+.account-banner {
+  border: 1.5px solid rgba(255, 98, 0, 0.65);
+  background: #fff7f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 15px;
+  color: #1a1a1a;
+  margin-bottom: 28px;
+}
+
+.plan-card {
+  border: 1.5px solid rgba(26, 26, 26, 0.14);
+  background: #faf8f4;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.plan-name {
+  font-family: "Clash Display", sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+.plan-badge {
+  flex: none;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 98, 0, 0.45);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: #ff6200;
+}
+
+.plan-meta {
+  font-size: 14px;
+  color: rgba(26, 26, 26, 0.62);
+  margin-top: 8px;
+}
+
+.account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
