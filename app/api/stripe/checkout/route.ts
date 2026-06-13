@@ -93,6 +93,10 @@ export async function POST(req: NextRequest) {
       automatic_tax: { enabled: true },
       tax_id_collection: { enabled: true },
       billing_address_collection: "required",
+      customer_update: {
+        address: "auto",
+        name: "auto",
+      },
       success_url: `${baseUrl}/account?checkout=success`,
       cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
       metadata: {
