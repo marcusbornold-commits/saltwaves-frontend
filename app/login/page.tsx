@@ -20,27 +20,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   );
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#f0ede8] px-5">
-      <div className="w-full max-w-sm">
-        <div className="mb-10 flex justify-center">
+    <main className="login-wrap">
+      <div className="login-card">
+        <div className="login-logo">
           <Logo />
         </div>
 
-        <h1 className="mb-2 text-center text-2xl font-bold text-[#1a1a1a]">
-          Sign in
-        </h1>
-        <p className="mb-8 text-center text-sm text-[#1a1a1a]/60">
-          Continue to Saltwaves Studio
-        </p>
+        <h1 className="login-title">Sign in</h1>
+        <p className="login-sub">Continue to Saltwaves Studio</p>
 
         {verify === "1" && (
-          <p className="mb-6 rounded-lg border border-[#1a1a1a]/10 bg-white/50 px-4 py-3 text-center text-sm text-[#1a1a1a]/80">
+          <p className="login-note">
             Check your email for a magic link to sign in.
           </p>
         )}
 
         {error && (
-          <p className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700">
+          <p className="login-note error">
             Something went wrong. Please try again.
           </p>
         )}
@@ -51,10 +47,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             await signIn("google", { redirectTo });
           }}
         >
-          <button
-            type="submit"
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm font-medium text-[#1a1a1a] transition-colors hover:border-[#1a1a1a]/25"
-          >
+          <button type="submit" className="btn-google">
             <GoogleIcon />
             Continue with Google
           </button>
@@ -62,10 +55,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         {magicLinkEnabled && (
           <>
-            <div className="my-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-[#1a1a1a]/10" />
-              <span className="text-xs text-[#1a1a1a]/40">or</span>
-              <div className="h-px flex-1 bg-[#1a1a1a]/10" />
+            <div className="login-divider">
+              <span>or</span>
             </div>
 
             <form
@@ -75,7 +66,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 if (typeof email !== "string" || !email) return;
                 await signIn("resend", { email, redirectTo });
               }}
-              className="space-y-3"
             >
               <label htmlFor="email" className="sr-only">
                 Email address
@@ -87,12 +77,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 required
                 autoComplete="email"
                 placeholder="you@example.com"
-                className="w-full rounded-lg border border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm text-[#1a1a1a] placeholder:text-[#1a1a1a]/35 outline-none transition-colors focus:border-[#ff6200] focus:ring-2 focus:ring-[#ff6200]/20"
+                className="login-field"
               />
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-[#ff6200] px-4 py-3 text-sm font-bold text-white transition-transform hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#ff6200]/25"
-              >
+              <button type="submit" className="btn-primary-full">
                 Send magic link
               </button>
             </form>
