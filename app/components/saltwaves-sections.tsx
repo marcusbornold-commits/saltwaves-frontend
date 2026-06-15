@@ -7,14 +7,14 @@ export function Nav({ dark }: any) {
   return (
     <header className={"nav" + (dark ? " nav-dark" : "")} data-screen-label="Navbar">
       <div className="container nav-inner">
-        <Wordmark dark={dark} />
+        <Wordmark dark={dark} href="/" />
         <nav aria-label="Main">
           <ul className="nav-links">
-            <li><a href="#demo">Hear it</a></li>
-            <li><a href="#how">How it works</a></li>
-            <li><a href="#tools">Tools</a></li>
-            <li><a href="#pricing">Pricing</a></li>
-            <li><a href="#faq">FAQ</a></li>
+            <li><a href="/#demo">Hear it</a></li>
+            <li><a href="/#how">How it works</a></li>
+            <li><a href="/#tools">Tools</a></li>
+            <li><a href="/#pricing">Pricing</a></li>
+            <li><a href="/#faq">FAQ</a></li>
           </ul>
         </nav>
         <a className="btn btn-primary btn-sm" href="#try">Try it free</a>

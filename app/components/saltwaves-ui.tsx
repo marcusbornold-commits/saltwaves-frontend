@@ -3,9 +3,9 @@
 import React, { useState, useRef } from "react";
 
 /* ---------- Brand wordmark ---------- */
-export function Wordmark({ dark }: any) {
+export function Wordmark({ dark, href = "/" }: { dark?: boolean; href?: string }) {
   return (
-    <a className="nav-brand" href="#top" aria-label="Saltwaves.studio home">
+    <a className="nav-brand" href={href} aria-label="Saltwaves.studio home">
       <img src={dark ? "/assets/emblem-paper.png" : "/assets/emblem-ink.png"} alt="Saltwaves emblem" />
       <span>saltwaves<span style={{ color: "var(--orange)" }}>.studio</span></span>
     </a>
