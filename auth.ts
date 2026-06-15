@@ -2,12 +2,14 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import { SupabaseAdapter } from "@auth/supabase-adapter";
+import { authConfig } from "./auth.config";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const hasAdapter = Boolean(supabaseUrl && supabaseServiceRoleKey);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   ...(hasAdapter
     ? {
         adapter: SupabaseAdapter({
@@ -26,23 +28,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: {
     strategy: "jwt",
-  },
-  pages: {
-    signIn: "/login",
-    verifyRequest: "/login?verify=1",
-  },
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.sub = user.id;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
-      }
-      return session;
-    },
   },
 });
