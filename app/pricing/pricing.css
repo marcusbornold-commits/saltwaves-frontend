@@ -1,0 +1,291 @@
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap");
+
+.pricing-page {
+  min-height: 100vh;
+  background: #f1ede8;
+  color: #1a1a1a;
+  font-family: "Archivo", sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.pricing-page h1,
+.pricing-page h2,
+.pricing-page h3 {
+  font-family: "Clash Display", sans-serif;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.028em;
+}
+
+.pricing-shell {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+.pricing-top {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 48px;
+}
+
+.pricing-kicker {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ff6200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.pricing-kicker::before {
+  content: "";
+  width: 26px;
+  height: 2px;
+  background: #ff6200;
+}
+
+.pricing-title {
+  font-size: clamp(2rem, 4.2vw, 3rem);
+  margin-bottom: 14px;
+}
+
+.pricing-sub {
+  color: rgba(26, 26, 26, 0.62);
+  max-width: 54ch;
+  font-size: 18px;
+}
+
+.pricing-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 56px;
+}
+
+.pricing-toggle-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bill-toggle {
+  display: inline-flex;
+  border: 1.5px solid rgba(26, 26, 26, 0.14);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+  background: #faf8f4;
+}
+
+.bill-toggle button {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 9px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  color: rgba(26, 26, 26, 0.62);
+  transition: background 0.18s ease, color 0.18s ease;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.bill-toggle button.on {
+  background: #1a1a1a;
+  color: #f1ede8;
+}
+
+.save-pill {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  color: #ff6200;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.price-card {
+  background: #faf8f4;
+  border: 1.5px solid rgba(26, 26, 26, 0.14);
+  border-radius: 18px;
+  padding: 34px 30px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.price-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(26, 26, 26, 0.08);
+}
+
+.price-card.featured {
+  border-color: #ff6200;
+  border-width: 2px;
+  box-shadow: 0 12px 36px rgba(255, 98, 0, 0.14);
+}
+
+.price-badge {
+  align-self: flex-start;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  background: #ff6200;
+  color: #1a1a1a;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 5px 12px;
+  margin-bottom: 18px;
+}
+
+.price-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.price-amount {
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 10px 0 2px;
+}
+
+.price-amount small {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.62);
+  letter-spacing: 0;
+}
+
+.price-list {
+  list-style: none;
+  margin: 22px 0 30px;
+  display: grid;
+  gap: 11px;
+  flex: 1;
+}
+
+.price-list li {
+  display: flex;
+  gap: 10px;
+  font-size: 15.5px;
+  color: rgba(26, 26, 26, 0.62);
+  align-items: baseline;
+}
+
+.price-list li::before {
+  content: "—";
+  color: #ff6200;
+  font-weight: 700;
+  flex: none;
+}
+
+.price-list li.soon {
+  color: rgba(26, 26, 26, 0.38);
+}
+
+.price-list li.soon::before {
+  color: rgba(255, 98, 0, 0.45);
+}
+
+.soon-badge {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(26, 26, 26, 0.18);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: rgba(26, 26, 26, 0.45);
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.pricing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.005em;
+  padding: 16px 28px;
+  border-radius: 10px;
+  border: none;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  font-family: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+
+.pricing-btn-primary {
+  background: #ff6200;
+  color: #1a1a1a;
+}
+
+.pricing-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(255, 98, 0, 0.35);
+}
+
+.pricing-btn-ghost {
+  background: transparent;
+  color: inherit;
+  border: 1.5px solid rgba(26, 26, 26, 0.14);
+}
+
+.pricing-btn-ghost:hover {
+  border-color: #ff6200;
+  color: #ff6200;
+  transform: translateY(-2px);
+}
+
+.pricing-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.pricing-microcopy {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: rgba(26, 26, 26, 0.62);
+  margin-top: 24px;
+}
+
+.pricing-notice {
+  margin-bottom: 32px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(26, 26, 26, 0.14);
+  background: #faf8f4;
+  font-size: 15px;
+  color: rgba(26, 26, 26, 0.8);
+  text-align: center;
+}
