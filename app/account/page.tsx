@@ -1,7 +1,7 @@
 import { auth, signOut } from "@/auth";
 import Logo from "@/components/Logo";
 import ManageBillingButton from "@/components/ManageBillingButton";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import "./account.css";
 
@@ -26,7 +26,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   const { checkout } = await searchParams;
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await getSupabaseAdmin()
     .from("profiles")
     .select(
       "subscription_status, lifetime_creator, founding_member_tier, current_period_end, stripe_customer_id",
