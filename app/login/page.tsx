@@ -11,7 +11,7 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { callbackUrl, verify, error } = await searchParams;
-  const redirectTo = callbackUrl ?? "/dashboard";
+  const redirectTo = callbackUrl ?? "/account";
   // Magic link kräver Supabase-adaptern + Resend; visas först när env är satt.
   const magicLinkEnabled = Boolean(
     process.env.SUPABASE_URL &&
