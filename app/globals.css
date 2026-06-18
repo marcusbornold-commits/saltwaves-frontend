@@ -262,6 +262,90 @@ header.nav {
 .upload-zone.dark .upload-file-row { background: rgba(255, 98, 0, 0.12); }
 .upload-file-name { font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
 
+/* Mic dropdown */
+.mic-dropdown { position: relative; text-align: left; margin-bottom: 16px; }
+.mic-dropdown-label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: "Clash Display", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+.mic-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f1ede8;
+  border: 1px solid rgba(26, 26, 26, 0.22);
+  border-radius: 0;
+  font-family: "Archivo", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mic-dropdown-trigger:hover,
+.mic-dropdown-trigger.open,
+.mic-dropdown-trigger:focus-visible {
+  border-color: #ff6200;
+  outline: none;
+  box-shadow: 0 0 0 1px #ff6200;
+}
+.mic-dropdown-chevron {
+  flex: none;
+  color: #ff6200;
+  transition: transform 0.15s ease;
+}
+.mic-dropdown-trigger.open .mic-dropdown-chevron { transform: rotate(180deg); }
+.mic-dropdown-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #f1ede8;
+  border: 1px solid rgba(26, 26, 26, 0.22);
+  border-radius: 0;
+  box-shadow: 0 10px 28px rgba(26, 26, 26, 0.08);
+}
+.mic-dropdown-option {
+  width: 100%;
+  padding: 11px 14px;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  text-align: left;
+  font-family: "Archivo", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.mic-dropdown-option:hover,
+.mic-dropdown-option.selected {
+  border-left-color: #ff6200;
+  background: rgba(255, 98, 0, 0.08);
+}
+.upload-zone.dark .mic-dropdown-label { color: var(--paper); }
+.upload-zone.dark .mic-dropdown-trigger,
+.upload-zone.dark .mic-dropdown-menu {
+  background: #2d2a27;
+  border-color: rgba(241, 237, 232, 0.22);
+  color: var(--paper);
+}
+.upload-zone.dark .mic-dropdown-option { color: var(--paper); }
+.upload-zone.dark .mic-dropdown-option:hover,
+.upload-zone.dark .mic-dropdown-option.selected {
+  background: rgba(255, 98, 0, 0.14);
+}
+
 /* Wave bars */
 .wavebars { display: flex; align-items: center; gap: 3px; height: 56px; }
 .wavebars span {

@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { ensureProfileForUser } from "@/lib/ensure-profile";
 
 export const authConfig = {
   pages: {
@@ -16,6 +17,12 @@ export const authConfig = {
       }
 
       return !!auth?.user;
+    },
+    async signIn({ user }) {
+      if (user?.id) {
+        await ensureProfileForUser(user.id);
+      }
+      return true;
     },
     async jwt({ token, user }) {
       if (user) {
