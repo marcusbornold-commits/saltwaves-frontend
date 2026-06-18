@@ -82,7 +82,7 @@ export async function getAccess(userId: string): Promise<AccessLevel> {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, subscription_status, lifetime_creator, founding_member_tier, current_price_id, current_period_end, stripe_customer_id",
+      "id, subscription_status, subscription_id, lifetime_creator, founding_member_tier, current_price_id, current_period_end, cancel_at_period_end, stripe_customer_id",
     )
     .eq("id", userId)
     .maybeSingle();

@@ -7,6 +7,7 @@ import {
   isAllowedPriceId,
   isFoundingPriceId,
 } from "@/lib/stripe-helpers";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type CheckoutBody = {
   price_id?: string;
@@ -37,13 +38,46 @@ export async function POST(request: Request) {
 
   const founding = isFoundingPriceId(priceId);
   const stripe = getStripe();
+  const supabaseAdmin = getSupabaseAdmin();
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("stripe_customer_id")
+    .eq("id", session.user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error("Failed to fetch profile for checkout:", profileError.message);
+    return NextResponse.json({ error: "Failed to start checkout" }, { status: 500 });
+  }
+
+  let stripeCustomerId = profile?.stripe_customer_id ?? null;
+
+  if (!stripeCustomerId) {
+    const customer = await stripe.customers.create({
+      email: session.user.email,
+      metadata: { user_id: session.user.id },
+    });
+    stripeCustomerId = customer.id;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("profiles")
+      .update({ stripe_customer_id: stripeCustomerId })
+      .eq("id", session.user.id);
+
+    if (updateError) {
+      console.error("Failed to save stripe customer id:", updateError.message);
+      return NextResponse.json({ error: "Failed to start checkout" }, { status: 500 });
+    }
+  }
 
   const checkoutSession = await stripe.checkout.sessions.create({
     mode: founding ? "payment" : "subscription",
-    customer_email: session.user.email,
+    customer: stripeCustomerId,
     client_reference_id: session.user.id,
     metadata: {
       user_id: session.user.id,
+      price_id: priceId,
     },
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: getCheckoutSuccessUrl(founding),
