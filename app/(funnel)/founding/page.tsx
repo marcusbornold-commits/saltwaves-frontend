@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { auth } from "@/auth";
-import Logo from "@/components/Logo";
 import { getFoundingCount, getFoundingTierInfo } from "@/lib/founding";
 import FoundingCheckoutButton from "./founding-checkout-button";
 import "./founding.css";
@@ -27,12 +25,6 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
   return (
     <main className="founding-page">
       <div className="founding-shell">
-        <div className="founding-top">
-          <Link href="/">
-            <Logo />
-          </Link>
-        </div>
-
         {checkout === "cancel" && (
           <p className="founding-notice">Checkout cancelled. Your spot is still available.</p>
         )}

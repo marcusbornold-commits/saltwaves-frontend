@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { auth } from "@/auth";
-import Logo from "@/components/Logo";
 import { getPriceIdsFromEnv } from "@/lib/pricing";
 import PricingPlans from "./pricing-plans";
 import "./pricing.css";
@@ -19,12 +17,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
   return (
     <main className="pricing-page">
       <div className="pricing-shell">
-        <div className="pricing-top">
-          <Link href="/">
-            <Logo />
-          </Link>
-        </div>
-
         {checkout === "cancel" && (
           <p className="pricing-notice">Checkout cancelled. Pick a plan when you are ready.</p>
         )}

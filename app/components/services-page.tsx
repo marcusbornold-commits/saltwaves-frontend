@@ -1,8 +1,6 @@
 "use client";
 
 import React from "react";
-import { Nav, Footer } from "./saltwaves-sections";
-
 const PACKAGES = [
   {
     kicker: "Kom igång",
@@ -89,7 +87,6 @@ export default function ServicesPage() {
 
   return (
     <>
-      <Nav />
       <main>
         <section
           className="band"
@@ -168,7 +165,6 @@ export default function ServicesPage() {
           </div>
         </section>
       </main>
-      <Footer />
     </>
   );
 }

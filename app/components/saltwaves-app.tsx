@@ -4,7 +4,7 @@
 // The values below are the TWEAK_DEFAULTS the design shipped with.
 import React from "react";
 import { HeroSplit, HeroWave, HeroConsole } from "./saltwaves-hero";
-import { Nav, DemoSection, HowItWorks, Credibility, Pricing, Footer } from "./saltwaves-sections";
+import { DemoSection, HowItWorks, Credibility, Pricing } from "./saltwaves-sections";
 import { ToolsSuite, FAQ, BlogTeaser, FinalCTA } from "./saltwaves-sections2";
 
 const TWEAK_DEFAULTS: any = {
@@ -52,12 +52,10 @@ export default function App() {
   }, [t.hero]);
 
   const headline = HEADLINES[t.headline] || HEADLINES["60 seconds"];
-  const heroDark = t.hero === "Console";
 
   return (
     <React.Fragment>
       <a id="top"></a>
-      <Nav dark={heroDark} />
       <main>
         {t.hero === "Split" && <HeroSplit headline={headline} subline={SUBLINE} />}
         {t.hero === "Wave" && <HeroWave headline={headline} subline={SUBLINE} motion={t.motion} />}
@@ -71,7 +69,6 @@ export default function App() {
         <BlogTeaser />
         <FinalCTA />
       </main>
-      <Footer />
     </React.Fragment>
   );
 }

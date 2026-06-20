@@ -11,13 +11,13 @@ export function Nav({ dark }: any) {
         <nav aria-label="Main">
           <ul className="nav-links">
             <li><a href="/#demo">Hear it</a></li>
-            <li><a href="/#how">How it works</a></li>
+            <li><a href="/services">How it works</a></li>
             <li><a href="/#tools">Tools</a></li>
-            <li><a href="/#pricing">Pricing</a></li>
+            <li><a href="/pricing">Pricing</a></li>
             <li><a href="/#faq">FAQ</a></li>
           </ul>
         </nav>
-        <a className="btn btn-primary btn-sm" href="#try">Try it free</a>
+        <a className="btn btn-primary btn-sm" href="/">Try it free</a>
       </div>
     </header>
   );

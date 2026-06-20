@@ -1,4 +1,4 @@
-import App from "./components/saltwaves-app";
+import App from "../components/saltwaves-app";
 
 export default function Home() {
   return <App />;

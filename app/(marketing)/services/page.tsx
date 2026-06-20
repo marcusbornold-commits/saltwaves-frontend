@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import ServicesPage from "../components/services-page";
+import ServicesPage from "../../components/services-page";
 
 export const metadata: Metadata = {
   title: "Konsulttjänster – Fast pris, fast leverans | Saltwaves.studio",
