@@ -3,7 +3,9 @@ import "server-only";
 import { getPriceIdsFromEnv } from "@/lib/pricing";
 
 function appBaseUrl(): string {
-  return process.env.AUTH_URL ?? "http://localhost:3000";
+  if (process.env.AUTH_URL) return process.env.AUTH_URL;
+  const port = process.env.PORT ?? "3000";
+  return `http://localhost:${port}`;
 }
 
 export function getAllowedPriceIds(): Set<string> {

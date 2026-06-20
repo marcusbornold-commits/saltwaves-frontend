@@ -3,22 +3,72 @@
 import React from "react";
 import { Wordmark, WaveBars, VUMeter, demoAudio } from "./saltwaves-ui";
 
+const navItems = [
+  { href: "/#demo", label: "Hear it" },
+  { href: "/services", label: "How it works" },
+  { href: "/#tools", label: "Tools" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/#faq", label: "FAQ" },
+];
+
 export function Nav({ dark }: any) {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
   return (
     <header className={"nav" + (dark ? " nav-dark" : "")} data-screen-label="Navbar">
       <div className="container nav-inner">
         <Wordmark dark={dark} href="/" />
         <nav aria-label="Main">
           <ul className="nav-links">
-            <li><a href="/#demo">Hear it</a></li>
-            <li><a href="/services">How it works</a></li>
-            <li><a href="/#tools">Tools</a></li>
-            <li><a href="/pricing">Pricing</a></li>
-            <li><a href="/#faq">FAQ</a></li>
+            {navItems.map((item) => (
+              <li key={item.href}><a href={item.href}>{item.label}</a></li>
+            ))}
           </ul>
         </nav>
-        <a className="btn btn-primary btn-sm" href="/">Try it free</a>
+        <div className="nav-actions">
+          <a className="btn btn-primary btn-sm" href="/login">Log in</a>
+          <button
+            type="button"
+            className="nav-menu-toggle"
+            aria-expanded={menuOpen}
+            aria-controls="nav-mobile-menu"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              {menuOpen ? (
+                <>
+                  <path d="M5 5l12 12"></path>
+                  <path d="M17 5L5 17"></path>
+                </>
+              ) : (
+                <>
+                  <path d="M3 6h16"></path>
+                  <path d="M3 11h16"></path>
+                  <path d="M3 16h16"></path>
+                </>
+              )}
+            </svg>
+          </button>
+        </div>
       </div>
+      <nav
+        id="nav-mobile-menu"
+        className={"nav-mobile-menu" + (menuOpen ? " is-open" : "")}
+        aria-label="Mobile"
+        hidden={!menuOpen}
+      >
+        <ul>
+          {navItems.map((item) => (
+            <li key={item.href}>
+              <a href={item.href} onClick={() => setMenuOpen(false)}>{item.label}</a>
+            </li>
+          ))}
+          <li>
+            <a className="text-ink hover:text-orange" href="/login" onClick={() => setMenuOpen(false)}>Log in</a>
+          </li>
+        </ul>
+      </nav>
     </header>
   );
 }

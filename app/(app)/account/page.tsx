@@ -1,6 +1,6 @@
 import { auth, signOut } from "@/auth";
-import Logo from "@/components/Logo";
 import ManageBillingButton from "@/components/ManageBillingButton";
+import { Nav } from "@/app/components/saltwaves-sections";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import "./account.css";
@@ -65,50 +65,49 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const planMeta = planMetaParts.join(" · ");
 
   return (
-    <main className="login-wrap">
-      <div className="login-card">
-        <div className="login-logo">
-          <Logo />
-        </div>
-
-        {checkout === "success" && (
-          <div className="account-banner">
-            Payment successful — welcome to Saltwaves.
-          </div>
-        )}
-
-        <h1 className="login-title">Your account</h1>
-        <p className="login-sub">{session.user.email}</p>
-
-        <div className="plan-card">
-          <div className="plan-row">
-            <span className="plan-name">{planName}</span>
-            {planBadge && <span className="plan-badge">{planBadge}</span>}
-          </div>
-          {planMeta && <p className="plan-meta">{planMeta}</p>}
-        </div>
-
-        <div className="account-actions">
-          {stripeCustomerId ? (
-            <ManageBillingButton />
-          ) : (
-            <a href="/pricing" className="btn-primary-full">
-              Upgrade your plan
-            </a>
+    <>
+      <Nav />
+      <main className="login-wrap account-wrap">
+        <div className="login-card">
+          {checkout === "success" && (
+            <div className="account-banner">
+              Payment successful — welcome to Saltwaves.
+            </div>
           )}
 
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
-          >
-            <button type="submit" className="btn-google">
-              Sign out
-            </button>
-          </form>
+          <h1 className="login-title">Your account</h1>
+          <p className="login-sub">{session.user.email}</p>
+
+          <div className="plan-card">
+            <div className="plan-row">
+              <span className="plan-name">{planName}</span>
+              {planBadge && <span className="plan-badge">{planBadge}</span>}
+            </div>
+            {planMeta && <p className="plan-meta">{planMeta}</p>}
+          </div>
+
+          <div className="account-actions">
+            {stripeCustomerId ? (
+              <ManageBillingButton />
+            ) : (
+              <a href="/pricing" className="btn-primary-full">
+                Upgrade your plan
+              </a>
+            )}
+
+            <form
+              action={async () => {
+                "use server";
+                await signOut({ redirectTo: "/login" });
+              }}
+            >
+              <button type="submit" className="btn-google">
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

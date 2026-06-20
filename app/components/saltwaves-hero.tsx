@@ -4,7 +4,7 @@ import React from "react";
 import { UploadZone, WaveBars, VUMeter } from "./saltwaves-ui";
 
 const heroCommon = {
-  ctaLabel: "Master your podcast in 60 seconds",
+  ctaLabel: "Try it free",
   micro: "Free · No account needed · .wav / .mp3",
 };
 
@@ -80,8 +80,10 @@ export function HeroSplit({ headline, subline }: any) {
           <p className="section-sub" style={{ marginBottom: 34 }}>{subline}</p>
           <HeroCTA />
         </div>
-        <div className="reveal in reveal-d1" id="try">
-          <UploadZone />
+        <div className="reveal in reveal-d1">
+          <div id="try" className="scroll-mt-72">
+            <UploadZone />
+          </div>
           <div style={{ marginTop: 22, opacity: 0.9 }}>
             <WaveBars n={64} seed={1.7} height={34} />
           </div>
@@ -108,8 +110,10 @@ export function HeroWave({ headline, subline, motion }: any) {
       <div style={{ margin: "clamp(28px, 4vw, 52px) 0" }}>
         <WaveCanvas motion={motion} height={170} />
       </div>
-      <div className="container" id="try" style={{ maxWidth: 640 }}>
-        <UploadZone />
+      <div className="container" style={{ maxWidth: 640 }}>
+        <div id="try" className="scroll-mt-72">
+          <UploadZone />
+        </div>
       </div>
     </section>
   );
@@ -132,8 +136,10 @@ export function HeroConsole({ headline, subline }: any) {
             <p className="section-sub" style={{ marginBottom: 34 }}>{subline}</p>
             <HeroCTA />
           </div>
-          <div id="try">
-            <UploadZone dark={true} />
+          <div>
+            <div id="try" className="scroll-mt-72">
+              <UploadZone dark={true} />
+            </div>
             <div style={{ marginTop: 22, opacity: 0.85 }}>
               <WaveBars n={64} seed={2.4} height={34} color="rgba(241,237,232,0.5)" />
             </div>
