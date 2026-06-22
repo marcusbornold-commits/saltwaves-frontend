@@ -67,7 +67,7 @@ export function ToolsSuite() {
 
 /* ---------- FAQ ---------- */
 const FAQ_ITEMS = [
-  { q: "Do you store my audio files?", a: "No. We process, deliver and delete. Your files never stay on our servers." },
+  { q: "Do you store my audio files?", a: "We process, deliver, and delete. Uploads go away after processing; mastered files within 48 hours — all plans, pre-v2." },
   { q: "What file formats are supported?", a: ".wav and .mp3, up to 200 MB on the free tier." },
   { q: "How is this different from Auphonic?", a: "PodMaster is trained on real studio sessions curated by a sound engineer — not generic audio datasets." },
   { q: "Can I use it for music?", a: "PodMaster is optimized for spoken word. Music mastering is on the roadmap." },
