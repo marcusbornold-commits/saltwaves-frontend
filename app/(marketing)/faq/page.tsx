@@ -31,7 +31,7 @@ export default function FaqPage() {
   return (
     <main className="band" style={{ paddingTop: 48, paddingBottom: 96 }}>
       <div className="container">
-        <div className="reveal">
+        <div>
           <div className="kicker">Help</div>
           <h1 className="section-title">FAQ</h1>
           <p className="section-sub" style={{ maxWidth: "52ch" }}>
@@ -39,7 +39,7 @@ export default function FaqPage() {
           </p>
         </div>
 
-        <div className="faq-list reveal reveal-d1">
+        <div className="faq-list">
           {FAQ_ITEMS.map((item, i) => (
             <div className={"faq-item" + (open === i ? " open" : "")} key={item.q}>
               <button
