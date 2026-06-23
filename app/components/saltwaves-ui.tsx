@@ -151,6 +151,8 @@ function MicDropdown({
   );
 }
 
+const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
 function UploadErrorMessage({ message }: { message: string }) {
   return (
     <div style={{ color: "var(--orange)", fontWeight: 500, fontSize: 14, marginTop: 12 }}>
@@ -168,6 +170,7 @@ export function UploadZone({ dark, compact }: any) {
   const [status, setStatus] = useState("idle"); // idle | ready | working | queued
   const [error, setError] = useState<any>(null);
   const [micType, setMicType] = useState<MicType>("unknown");
+  const [email, setEmail] = useState("");
   const inputRef = useRef<any>(null);
 
   const accept = (f: any) => {
@@ -191,11 +194,16 @@ export function UploadZone({ dark, compact }: any) {
     e.stopPropagation();
     if (!file) return;
 
+    if (!isValidEmail(email)) {
+      setError("Enter a valid email so we can send your mastered file.");
+      return;
+    }
+
     setStatus("working");
     setError(null);
 
     try {
-      await uploadAudio(file, micType);
+      await uploadAudio(file, micType, email.trim());
       setStatus("queued");
     } catch (err) {
       setError(
@@ -211,6 +219,7 @@ export function UploadZone({ dark, compact }: any) {
     setStatus("idle");
     setError(null);
     setMicType("unknown");
+    setEmail("");
   };
 
   return (
@@ -262,10 +271,33 @@ export function UploadZone({ dark, compact }: any) {
           {status === "ready" && (
             <>
               {error && <UploadErrorMessage message={error} />}
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="upload-email-input"
+                style={{
+                  width: "100%",
+                  padding: "11px 14px",
+                  marginBottom: 10,
+                  borderRadius: 8,
+                  border: "1px solid var(--line, rgba(0,0,0,0.15))",
+                  background: "transparent",
+                  color: "inherit",
+                  fontSize: 15,
+                }}
+                aria-label="Email address for delivery"
+              />
               <MicDropdown value={micType} onChange={setMicType} />
               <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={startMastering}>
                 Start mastering
               </button>
+              <div className="microcopy" style={{ marginTop: 8, textAlign: "center" }}>
+                We email your file and delete it after. No account, no storage.
+              </div>
             </>
           )}
           {status === "working" && (

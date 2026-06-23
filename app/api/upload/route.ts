@@ -85,7 +85,11 @@ export async function POST(request: Request) {
   upstream.append("file", file, file.name);
 
   const micType = parseMicType(formData.get("mic_type"));
-  const upstreamUrl = `${apiUrl}/upload?mode=standard&mic_type=${encodeURIComponent(micType)}`;
+  const emailRaw = formData.get("email");
+  const email = typeof emailRaw === "string" ? emailRaw.trim() : "";
+  const params = new URLSearchParams({ mode: "standard", mic_type: micType });
+  if (email) params.set("email", email);
+  const upstreamUrl = `${apiUrl}/upload?${params.toString()}`;
 
   const headers: HeadersInit = {};
   if (jwt) {

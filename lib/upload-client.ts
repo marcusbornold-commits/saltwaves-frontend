@@ -18,10 +18,12 @@ export class UploadError extends Error {
 export async function uploadAudio(
   file: File,
   micType: MicType = "unknown",
+  email = "",
 ): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
   form.append("mic_type", micType);
+  if (email) form.append("email", email);
 
   const response = await fetch("/api/upload", {
     method: "POST",
