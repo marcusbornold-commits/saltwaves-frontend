@@ -20,15 +20,54 @@ export async function uploadAudio(
   micType: MicType = "unknown",
   email = "",
 ): Promise<UploadResult> {
-  const form = new FormData();
-  form.append("file", file);
-  form.append("mic_type", micType);
-  if (email) form.append("email", email);
+  if (!/\.(wav|mp3|m4a)$/i.test(file.name)) {
+    throw new UploadError(
+      "This doesn't look like an audio file we can read. We support WAV, MP3, and M4A.",
+      "invalid_file_type",
+    );
+  }
 
-  const response = await fetch("/api/upload", {
-    method: "POST",
-    body: form,
-  });
+  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (!apiBase) {
+    throw new UploadError(
+      "Upload is temporarily unavailable — try again in a few minutes.",
+      "service_unavailable",
+    );
+  }
+
+  let token: string | null = null;
+  try {
+    const tokenRes = await fetch("/api/upload-token");
+    if (tokenRes.ok) {
+      const tokenData = (await tokenRes.json()) as { token: string | null };
+      token = tokenData.token ?? null;
+    }
+  } catch {
+    token = null;
+  }
+
+  const params = new URLSearchParams({ mode: "standard", mic_type: micType });
+  if (email) params.set("email", email);
+
+  const form = new FormData();
+  form.append("file", file, file.name);
+
+  const headers: HeadersInit = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}/upload?${params.toString()}`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+  } catch {
+    throw new UploadError(
+      "Upload is temporarily unavailable — try again in a few minutes.",
+      "service_unavailable",
+    );
+  }
 
   const data = (await response.json().catch(() => ({}))) as UploadResult & {
     error?: string;
