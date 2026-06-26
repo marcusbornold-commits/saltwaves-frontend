@@ -1,0 +1,82 @@
+/* Shared styling for legal pages (/privacy, /terms).
+   Layers on top of the global v3 design system — headings/body fonts
+   are inherited from globals; this only handles layout, tables, links. */
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 6rem;
+  color: var(--ink, #1a1a1a);
+  line-height: 1.65;
+}
+
+.page h1 {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  line-height: 1.1;
+  margin: 0 0 0.5rem;
+}
+
+.updated {
+  color: #6f6a63;
+  font-size: 0.9rem;
+  margin: 0 0 3rem;
+}
+
+.page h2 {
+  font-size: 1.4rem;
+  margin: 3rem 0 0.75rem;
+}
+
+.page h3 {
+  font-size: 1.1rem;
+  margin: 1.75rem 0 0.5rem;
+}
+
+.page p {
+  margin: 0 0 1rem;
+  font-size: 1.02rem;
+}
+
+.page ul {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.page li {
+  font-size: 1.02rem;
+}
+
+.page a {
+  color: var(--orange, #ff6200);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.95rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #d9d3ca;
+  vertical-align: top;
+}
+
+.table th {
+  font-weight: 600;
+  border-bottom: 2px solid var(--ink, #1a1a1a);
+}
+
+.contact {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #d9d3ca;
+}
