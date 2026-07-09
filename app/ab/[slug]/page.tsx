@@ -13,6 +13,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${page.title} — A/B Review · Saltwaves`,
     robots: { index: false, follow: false },
+    openGraph: {
+      title: `${page.title} — A/B Review · Saltwaves`,
+      description: "Private A/B audio comparison",
+    },
   };
 }
 
