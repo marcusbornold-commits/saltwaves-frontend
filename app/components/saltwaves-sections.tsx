@@ -180,7 +180,7 @@ function StepIcon({ kind }: any) {
 export function HowItWorks() {
   const steps = [
     { icon: "upload", title: "Upload", body: "Drop your episode export — .wav or .mp3, any length." },
-    { icon: "process", title: "AI processing", body: "Noise reduction, EQ balance, loudness to broadcast spec." },
+    { icon: "process", title: "Processing", body: "Noise reduction, EQ balance, loudness to broadcast spec." },
     { icon: "download", title: "Download", body: "Broadcast-ready audio in your inbox." },
   ];
   return (
