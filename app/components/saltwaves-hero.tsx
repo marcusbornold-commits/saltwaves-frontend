@@ -75,7 +75,7 @@ export function HeroSplit({ headline, subline }: any) {
     <section className="band" data-screen-label="Hero (Split)" style={{ paddingTop: "clamp(64px, 9vw, 110px)" }}>
       <div className="container" style={{ display: "grid", gridTemplateColumns: "minmax(0, 7fr) minmax(0, 5fr)", gap: "clamp(32px, 5vw, 72px)", alignItems: "center" }}>
         <div className="reveal in">
-          <div className="kicker">PodMaster — AI podcast mastering</div>
+          <div className="kicker">PodMaster – Broadcast-grade podcast mastering</div>
           <h1 style={{ fontSize: "clamp(2.7rem, 5.6vw, 4.4rem)", marginBottom: 20 }}>{headline}</h1>
           <p className="section-sub" style={{ marginBottom: 34 }}>{subline}</p>
           <HeroCTA />
@@ -99,7 +99,7 @@ export function HeroWave({ headline, subline, motion }: any) {
   return (
     <section className="band" data-screen-label="Hero (Wave)" style={{ paddingTop: "clamp(56px, 8vw, 96px)", paddingBottom: "clamp(64px, 9vw, 110px)" }}>
       <div className="container" style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div className="kicker" style={{ justifyContent: "center" }}>PodMaster — AI podcast mastering</div>
+        <div className="kicker" style={{ justifyContent: "center" }}>PodMaster – Broadcast-grade podcast mastering</div>
         <h1 style={{ fontSize: "clamp(2.8rem, 6.2vw, 5rem)", maxWidth: "16ch", marginBottom: 22 }}>{headline}</h1>
         <p className="section-sub" style={{ margin: "0 auto 36px" }}>{subline}</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center", marginBottom: 8 }}>
@@ -131,7 +131,7 @@ export function HeroConsole({ headline, subline }: any) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 7fr) minmax(0, 5fr)", gap: "clamp(32px, 5vw, 72px)", alignItems: "center" }}>
           <div>
-            <div className="kicker">PodMaster — AI podcast mastering</div>
+            <div className="kicker">PodMaster – Broadcast-grade podcast mastering</div>
             <h1 style={{ fontSize: "clamp(2.7rem, 5.6vw, 4.4rem)", marginBottom: 20 }}>{headline}</h1>
             <p className="section-sub" style={{ marginBottom: 34 }}>{subline}</p>
             <HeroCTA />

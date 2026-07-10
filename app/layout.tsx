@@ -9,13 +9,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "PodMaster by Saltwaves.studio — AI Podcast Mastering",
+  title: "PodMaster by Saltwaves.studio – Broadcast-Grade Podcast Mastering",
   description:
-    "Master your podcast in 60 seconds. PodMaster cleans noise, balances EQ and matches loudness with AI — built by a sound engineer with 20 years behind the console. Free, no account needed.",
+    "Master your podcast in 60 seconds. PodMaster cleans noise, balances EQ and matches loudness to broadcast spec — a processing chain built on 20 years behind the console. Free, no account needed.",
   keywords:
-    "podcast mastering, AI audio mastering, podcast loudness, noise reduction, audio mastering online",
+    "podcast mastering, broadcast podcast mastering, podcast loudness, noise reduction, audio mastering online",
   openGraph: {
-    title: "PodMaster — AI Podcast Mastering by Saltwaves.studio",
+    title: "PodMaster by Saltwaves.studio – Broadcast-Grade Podcast Mastering",
     description:
       "Drop in your episode, get broadcast-ready audio back. Free to try, no account needed.",
     type: "website",

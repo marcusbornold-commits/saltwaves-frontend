@@ -315,111 +315,40 @@ export function UploadZone({ dark, compact }: any) {
   );
 }
 
-/* ---------- Synthesized before/after demo audio ----------
-   Placeholder clips: a short plucked phrase rendered two ways.
-   "raw"      = quiet, band-limited, noise bed + hum (untreated recording)
-   "mastered" = full-range, EQ'd, compressed, loudness-matched
-   Swap for real <audio> clips when available.                       */
+/* ---------- Before/after demo audio ---------- */
 export const demoAudio = (() => {
-  let ctx: any = null;
-  let current: any = null; // { nodes: [], master, timer }
+  const sources: Record<string, string> = {
+    raw: "/hero/hero_before.mp3",
+    mastered: "/hero/hero_after.mp3",
+  };
+  let current: HTMLAudioElement | null = null;
+  let onEndCb: (() => void) | null = null;
 
-  function ensureCtx() {
-    if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (ctx.state === "suspended") ctx.resume();
-    return ctx;
+  function handleEnded() {
+    const cb = onEndCb;
+    stop();
+    cb?.();
   }
 
   function stop() {
     if (!current) return;
-    const { nodes, master, timer } = current;
-    clearTimeout(timer);
-    const now = ctx.currentTime;
-    try { master.gain.cancelScheduledValues(now); master.gain.setTargetAtTime(0, now, 0.04); } catch (e) {}
-    setTimeout(() => {
-      nodes.forEach((n: any) => { try { n.stop && n.stop(); } catch (e) {} });
-      try { master.disconnect(); } catch (e) {}
-    }, 120);
+    current.pause();
+    current.currentTime = 0;
+    current.removeEventListener("ended", handleEnded);
     current = null;
+    onEndCb = null;
   }
 
-  function play(kind: any, onEnd: any) {
-    const ac = ensureCtx();
+  function play(kind: string, onEnd?: () => void) {
     stop();
-    const t0 = ac.currentTime + 0.05;
-    const dur = 5.6;
-    const nodes: any[] = [];
-
-    const master = ac.createGain();
-    master.gain.value = kind === "mastered" ? 0.5 : 0.17;
-
-    let chainIn = master;
-    if (kind === "mastered") {
-      const comp = ac.createDynamicsCompressor();
-      comp.threshold.value = -26; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.18;
-      const presence = ac.createBiquadFilter();
-      presence.type = "peaking"; presence.frequency.value = 3200; presence.gain.value = 3.5; presence.Q.value = 0.9;
-      chainIn = presence; presence.connect(comp); comp.connect(master);
-    } else {
-      const lp = ac.createBiquadFilter();
-      lp.type = "lowpass"; lp.frequency.value = 3400; lp.Q.value = 0.6;
-      const hp = ac.createBiquadFilter();
-      hp.type = "highpass"; hp.frequency.value = 240;
-      chainIn = hp; hp.connect(lp); lp.connect(master);
-    }
-    master.connect(ac.destination);
-
-    // Plucked phrase (same musical content both ways)
-    const phrase = [220, 277.18, 329.63, 440, 369.99, 329.63, 277.18, 246.94, 220, 277.18, 329.63, 220];
-    phrase.forEach((f, i) => {
-      const start = t0 + i * 0.42;
-      const osc = ac.createOscillator();
-      osc.type = "triangle"; osc.frequency.value = f;
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.0001, start);
-      g.gain.exponentialRampToValueAtTime(0.8, start + 0.015);
-      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.55);
-      osc.connect(g); g.connect(chainIn);
-      osc.start(start); osc.stop(start + 0.6);
-      nodes.push(osc);
+    const audio = new Audio(sources[kind]);
+    onEndCb = onEnd ?? null;
+    current = audio;
+    audio.addEventListener("ended", handleEnded);
+    audio.play().catch(() => {
+      stop();
+      onEnd?.();
     });
-
-    // Low pad underneath
-    const pad = ac.createOscillator();
-    pad.type = "sine"; pad.frequency.value = 110;
-    const padG = ac.createGain();
-    padG.gain.setValueAtTime(0.0001, t0);
-    padG.gain.exponentialRampToValueAtTime(0.16, t0 + 0.8);
-    padG.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    pad.connect(padG); padG.connect(chainIn);
-    pad.start(t0); pad.stop(t0 + dur);
-    nodes.push(pad);
-
-    if (kind === "raw") {
-      // Noise bed
-      const len = Math.ceil(ac.sampleRate * 2);
-      const buf = ac.createBuffer(1, len, ac.sampleRate);
-      const ch = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * 0.5;
-      const noise = ac.createBufferSource();
-      noise.buffer = buf; noise.loop = true;
-      const nFilt = ac.createBiquadFilter();
-      nFilt.type = "lowpass"; nFilt.frequency.value = 5200;
-      const nG = ac.createGain(); nG.gain.value = 0.16;
-      noise.connect(nFilt); nFilt.connect(nG); nG.connect(master);
-      noise.start(t0); noise.stop(t0 + dur);
-      nodes.push(noise);
-      // Mains hum
-      const hum = ac.createOscillator();
-      hum.type = "sawtooth"; hum.frequency.value = 60;
-      const humG = ac.createGain(); humG.gain.value = 0.045;
-      hum.connect(humG); humG.connect(master);
-      hum.start(t0); hum.stop(t0 + dur);
-      nodes.push(hum);
-    }
-
-    const timer = setTimeout(() => { current = null; onEnd && onEnd(); }, (dur + 0.2) * 1000);
-    current = { nodes, master, timer };
   }
 
   return { play, stop };

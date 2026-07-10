@@ -110,8 +110,8 @@ function DemoCard({ kind, playing, onToggle }: any) {
       />
       <div className="demo-tags">
         {(mastered
-          ? ["noise removed", "EQ balanced", "−16 LUFS"]
-          : ["room noise", "uneven levels", "−31 LUFS"]
+          ? ["noise removed", "EQ balanced", "-16 LUFS"]
+          : ["room noise", "uneven levels", "-31 LUFS"]
         ).map((t) => (
           <span className="demo-tag" key={t}>{t}</span>
         ))}
@@ -144,9 +144,6 @@ export function DemoSection() {
           <div className="reveal reveal-d1"><DemoCard kind="raw" playing={playing === "raw"} onToggle={() => toggle("raw")} /></div>
           <div className="reveal reveal-d2"><DemoCard kind="mastered" playing={playing === "mastered"} onToggle={() => toggle("mastered")} /></div>
         </div>
-        <p className="microcopy reveal reveal-d3" style={{ marginTop: 26 }}>
-          synthesized placeholder clips — swap in real episode audio before launch
-        </p>
       </div>
     </section>
   );
