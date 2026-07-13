@@ -20,6 +20,12 @@ export interface AnalysisResult {
   ltas: LtasResult | null;
 }
 
+export interface MomentaryLoudnessPoint {
+  /** Center of the 400 ms analysis window (seconds). */
+  timeSec: number;
+  lufs: number;
+}
+
 export const THIRD_OCT_CENTERS = [
   50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800,
   1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000,
@@ -66,8 +72,8 @@ function kWeight(x: Float32Array): Float64Array {
 const toLufs = (p: number) => -0.691 + 10 * Math.log10(p + 1e-20);
 const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
 
-// ---------- Integrated LUFS + LRA ----------
-async function loudness(channels: Float32Array[]) {
+// ---------- K-weighted cumulative power (shared by integrated + momentary) ----------
+async function kWeightedCumulativePower(channels: Float32Array[]) {
   const cum: Float64Array[] = [];
   for (const c of channels) {
     const kw = kWeight(c);
@@ -80,13 +86,21 @@ async function loudness(channels: Float32Array[]) {
   const winPow = (start: number, len: number) => {
     let p = 0;
     for (const cs of cum) p += (cs[start + len] - cs[start]) / len;
-    return p; // sum over channels of mean square (G = 1)
+    return p;
   };
+  return { n, winPow };
+}
 
-  const hop = Math.round(0.1 * SR);
+const MOMENTARY_WIN_SEC = 0.4;
+const MOMENTARY_HOP_SEC = 0.1;
+
+// ---------- Integrated LUFS + LRA ----------
+async function loudness(channels: Float32Array[]) {
+  const { n, winPow } = await kWeightedCumulativePower(channels);
+  const hop = Math.round(MOMENTARY_HOP_SEC * SR);
 
   // Momentary 400 ms blocks, gated per BS.1770-4
-  const bLen = Math.round(0.4 * SR);
+  const bLen = Math.round(MOMENTARY_WIN_SEC * SR);
   const blocks: number[] = [];
   for (let s = 0; s + bLen <= n; s += hop) blocks.push(winPow(s, bLen));
   const absPass = blocks.filter((p) => toLufs(p) > -70);
@@ -253,6 +267,23 @@ async function ltas(
 }
 
 // ---------- Public API ----------
+/** Ungated BS.1770 momentary loudness (400 ms window, 100 ms hop) for realtime meters. */
+export async function computeMomentaryLoudnessSeries(
+  channels: Float32Array[]
+): Promise<MomentaryLoudnessPoint[]> {
+  const { n, winPow } = await kWeightedCumulativePower(channels);
+  const hop = Math.round(MOMENTARY_HOP_SEC * SR);
+  const bLen = Math.round(MOMENTARY_WIN_SEC * SR);
+  const series: MomentaryLoudnessPoint[] = [];
+  for (let s = 0; s + bLen <= n; s += hop) {
+    series.push({
+      timeSec: (s + bLen / 2) / SR,
+      lufs: toLufs(winPow(s, bLen)),
+    });
+  }
+  return series;
+}
+
 export async function analyzeChannels(
   channels: Float32Array[],
   onProgress?: (stage: string, frac: number) => void
