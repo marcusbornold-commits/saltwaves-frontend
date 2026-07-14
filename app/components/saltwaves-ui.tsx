@@ -1,6 +1,7 @@
 "use client";
 // saltwaves-ui.jsx — shared primitives: wordmark, upload zone, wave bars, VU meter, demo audio engine
 import React, { useState, useRef, useEffect } from "react";
+import { FREE_TIER_LIMITS } from "@/lib/access-limits";
 import { uploadAudio, type MicType } from "@/lib/upload-client";
 
 /* ---------- Brand wordmark ---------- */
@@ -152,6 +153,8 @@ function MicDropdown({
 }
 
 const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+const FREE_TIER_MAX_FILE_SIZE_BYTES = FREE_TIER_LIMITS.maxFileSizeMB * 1024 * 1024;
+const FILE_SIZE_ERROR = `File exceeds ${FREE_TIER_LIMITS.maxFileSizeMB}MB limit for free plan`;
 
 function UploadErrorMessage({ message }: { message: string }) {
   return (
@@ -167,8 +170,9 @@ function UploadErrorMessage({ message }: { message: string }) {
 export function UploadZone({ dark, compact }: any) {
   const [file, setFile] = useState<any>(null);
   const [dragging, setDragging] = useState(false);
-  const [status, setStatus] = useState("idle"); // idle | ready | working | queued
+  const [status, setStatus] = useState("idle"); // idle | ready | size-error | working | queued
   const [error, setError] = useState<any>(null);
+  const [hasFileSizeError, setHasFileSizeError] = useState(false);
   const [micType, setMicType] = useState<MicType>("unknown");
   const [email, setEmail] = useState("");
   const inputRef = useRef<any>(null);
@@ -179,6 +183,14 @@ export function UploadZone({ dark, compact }: any) {
       setError("This doesn't look like an audio file we can read. We support WAV, MP3, and M4A.");
       return;
     }
+    if (f.size > FREE_TIER_MAX_FILE_SIZE_BYTES) {
+      setFile(f);
+      setHasFileSizeError(true);
+      setError(FILE_SIZE_ERROR);
+      setStatus("size-error");
+      return;
+    }
+    setHasFileSizeError(false);
     setError(null);
     setFile(f);
     setStatus("ready");
@@ -193,6 +205,13 @@ export function UploadZone({ dark, compact }: any) {
   const startMastering = async (e: any) => {
     e.stopPropagation();
     if (!file) return;
+
+    if (file.size > FREE_TIER_MAX_FILE_SIZE_BYTES) {
+      setHasFileSizeError(true);
+      setError(FILE_SIZE_ERROR);
+      setStatus("size-error");
+      return;
+    }
 
     if (!isValidEmail(email)) {
       setError("Enter a valid email so we can send your mastered file.");
@@ -218,6 +237,7 @@ export function UploadZone({ dark, compact }: any) {
     setFile(null);
     setStatus("idle");
     setError(null);
+    setHasFileSizeError(false);
     setMicType("unknown");
     setEmail("");
   };
@@ -268,7 +288,7 @@ export function UploadZone({ dark, compact }: any) {
             <button className="btn btn-ghost btn-sm" onClick={reset} aria-label="Remove file" style={{ padding: "8px 12px" }}>✕</button>
           </div>
 
-          {status === "ready" && (
+          {(status === "ready" || status === "size-error") && (
             <>
               {error && <UploadErrorMessage message={error} />}
               <input
@@ -292,7 +312,17 @@ export function UploadZone({ dark, compact }: any) {
                 aria-label="Email address for delivery"
               />
               <MicDropdown value={micType} onChange={setMicType} />
-              <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={startMastering}>
+              <button
+                className="btn btn-primary"
+                style={{
+                  width: "100%",
+                  justifyContent: "center",
+                  opacity: !file || hasFileSizeError ? 0.5 : 1,
+                  cursor: !file || hasFileSizeError ? "not-allowed" : "pointer",
+                }}
+                onClick={startMastering}
+                disabled={!file || hasFileSizeError}
+              >
                 Start mastering
               </button>
               <div className="microcopy" style={{ marginTop: 8, textAlign: "center" }}>

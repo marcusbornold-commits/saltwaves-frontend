@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@/auth";
+import { FREE_TIER_LIMITS } from "@/lib/access-limits";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Profile } from "@/types/profile";
 import { redirect } from "next/navigation";
@@ -19,7 +20,7 @@ const FREE_ACCESS: AccessLevel = {
   plan: "free",
   isPaid: false,
   isFounding: false,
-  maxFileSizeMB: 200,
+  maxFileSizeMB: FREE_TIER_LIMITS.maxFileSizeMB,
   maxDurationMinutes: 60,
 };
 
