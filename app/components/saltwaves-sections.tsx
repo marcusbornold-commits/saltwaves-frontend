@@ -389,9 +389,9 @@ export function Footer() {
               AI audio tools, built with an engineer's ears.
             </p>
             <div className="footer-social">
-              <a href="#" aria-label="LinkedIn"><SocialIcon kind="linkedin" /></a>
-              <a href="#" aria-label="YouTube"><SocialIcon kind="youtube" /></a>
-              <a href="#" aria-label="Instagram"><SocialIcon kind="instagram" /></a>
+              <a href="https://www.linkedin.com/in/marcus-bornold-9152a3407/" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><SocialIcon kind="linkedin" /></a>
+              <a href="https://www.youtube.com/@saltwavestudio" aria-label="YouTube" target="_blank" rel="noopener noreferrer"><SocialIcon kind="youtube" /></a>
+              <a href="https://www.instagram.com/podmaster.studio/" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><SocialIcon kind="instagram" /></a>
             </div>
           </div>
           <div className="footer-cols">
