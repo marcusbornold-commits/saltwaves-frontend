@@ -22,8 +22,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google,
     // Magic link kräver en databas-adapter; aktiveras när Supabase-env finns.
     ...(hasAdapter
-      // TODO: byt tillbaka till login@saltwaves.studio när domänen är verifierad i Resend (kräver Cloudflare DNS-migrering)
-      ? [Resend({ from: "onboarding@resend.dev" })]
+      // TODO: send.saltwaves.studio är verifierad; apex (login@saltwaves.studio) kräver fortfarande DNS-migrering om den ska användas
+      ? [Resend({ from: "login@send.saltwaves.studio" })]
       : []),
   ],
   session: {
