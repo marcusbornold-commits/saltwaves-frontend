@@ -68,8 +68,8 @@ export function ToolsSuite() {
           <div className="reveal reveal-d2" style={{ display: "grid" }}>
             <ToolCard
               name="Loudness Inspector"
-              desc="Free LUFS / true peak compliance checker for any platform spec."
-              tag="free · instant check"
+              desc="LUFS / true peak spec sheet. Analyzer launches in August."
+              tag="free · launches in August"
               href="https://saltwaves.studio/podcast-loudness-checker"
             />
           </div>
