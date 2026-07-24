@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       price_id: priceId,
     },
     line_items: [{ price: priceId, quantity: 1 }],
+    ...(founding ? { invoice_creation: { enabled: true } } : {}),
     automatic_tax: { enabled: true },
     billing_address_collection: "required",
     success_url: getCheckoutSuccessUrl(founding),

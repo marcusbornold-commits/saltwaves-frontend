@@ -207,7 +207,7 @@ export function HowItWorks() {
 
 /* ---------- Credibility + testimonials ---------- */
 const TESTIMONIALS = [
-  { quote: "Placeholder — beta feedback goes here. A line or two about how the show finally sounds like a real production.", who: "Beta tester · show name" },
+  { quote: "Saltwaves is a really smooth tool that makes a clear difference right away. Excited to follow where this goes!", who: "Jonatan Samuelsson · Adora, Narnia", avatar: "/testimonials/jonatan.jpg", alt: "Jonatan Samuelsson" },
   { quote: "Placeholder — beta feedback goes here. Something specific: noise floor, loudness, the time it saved.", who: "Beta tester · show name" },
   { quote: "Placeholder — beta feedback goes here. Why they stopped fiddling with plugins and just upload now.", who: "Beta tester · show name" },
 ];
@@ -242,7 +242,11 @@ export function Credibility() {
             <article className={"testi-card reveal reveal-d" + (i + 1)} key={i}>
               <p className="testi-quote">“{t.quote}”</p>
               <div className="testi-who">
-                <span className="testi-avatar">IMG</span>
+                {t.avatar ? (
+                  <img className="testi-avatar" src={t.avatar} alt={t.alt} />
+                ) : (
+                  <span className="testi-avatar">IMG</span>
+                )}
                 <span className="microcopy">{t.who}</span>
               </div>
             </article>
