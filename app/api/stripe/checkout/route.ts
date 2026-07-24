@@ -74,12 +74,15 @@ export async function POST(request: Request) {
   const checkoutSession = await stripe.checkout.sessions.create({
     mode: founding ? "payment" : "subscription",
     customer: stripeCustomerId,
+    customer_update: { address: "auto", name: "auto" },
     client_reference_id: session.user.id,
     metadata: {
       user_id: session.user.id,
       price_id: priceId,
     },
     line_items: [{ price: priceId, quantity: 1 }],
+    automatic_tax: { enabled: true },
+    billing_address_collection: "required",
     success_url: getCheckoutSuccessUrl(founding),
     cancel_url: getCheckoutCancelUrl(founding),
   });
