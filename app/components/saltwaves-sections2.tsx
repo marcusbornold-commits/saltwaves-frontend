@@ -31,7 +31,17 @@ function ToolCard({ name, desc, tag, soon, flagship, href }: any) {
     </React.Fragment>
   );
   if (soon) return <article className={cls} data-status="hidden">{inner}</article>;
-  return <a className={cls} href={flagship ? "#try" : "#"}>{inner}</a>;
+  const linkHref = href ?? (flagship ? "#try" : "#");
+  const external = linkHref.startsWith("http");
+  return (
+    <a
+      className={cls}
+      href={linkHref}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {inner}
+    </a>
+  );
 }
 
 export function ToolsSuite() {
@@ -48,10 +58,20 @@ export function ToolsSuite() {
             <ToolCard flagship name="PodMaster" desc="Broadcast-grade podcast mastering. Drop an episode, get broadcast-ready audio back in about a minute." tag="flagship · free tier" />
           </div>
           <div className="reveal reveal-d1" style={{ display: "grid" }}>
-            <ToolCard name="PrompterMaster" desc="Free browser teleprompter. No download needed." tag="free · in your browser" />
+            <ToolCard
+              name="PrompterMaster"
+              desc="Free browser teleprompter. No download needed."
+              tag="free · in your browser"
+              href="https://saltwaves.studio/promptermaster"
+            />
           </div>
           <div className="reveal reveal-d2" style={{ display: "grid" }}>
-            <ToolCard name="Loudness Inspector" desc="Free LUFS / true peak compliance checker for any platform spec." tag="free · instant check" />
+            <ToolCard
+              name="Loudness Inspector"
+              desc="Free LUFS / true peak compliance checker for any platform spec."
+              tag="free · instant check"
+              href="https://saltwaves.studio/podcast-loudness-checker"
+            />
           </div>
           <div className="reveal reveal-d2" style={{ display: "grid" }}>
             <ToolCard soon name="AudioFixer" desc="Audio restoration for video creators." tag="in the workshop" />
