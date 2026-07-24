@@ -46,6 +46,10 @@ export function getCheckoutCancelUrl(founding: boolean): string {
   return `${appBaseUrl()}/pricing?checkout=cancel`;
 }
 
+export function getPortalReturnUrl(): string {
+  return `${appBaseUrl()}/account`;
+}
+
 export type PlanSlug = "creator" | "studio";
 
 export function getPlanFromPriceId(priceId: string): PlanSlug | null {
