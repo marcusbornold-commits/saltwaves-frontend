@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { demoAudio } from "./saltwaves-ui";
+import { DemoCard } from "./saltwaves-sections";
 
 const AUDIENCES = [
   {
@@ -28,6 +30,20 @@ const DELIVERABLES = [
 const MAIL = "mailto:hello@saltwaves.studio?subject=Post-production%20enquiry";
 
 export default function PostProductionPage() {
+  const [playing, setPlaying] = React.useState<"audiobook-raw" | "audiobook-mastered" | null>(null);
+
+  const toggle = (kind: "audiobook-raw" | "audiobook-mastered") => {
+    if (playing === kind) {
+      demoAudio.stop();
+      setPlaying(null);
+    } else {
+      demoAudio.play(kind, () => setPlaying(null));
+      setPlaying(kind);
+    }
+  };
+
+  React.useEffect(() => () => demoAudio.stop(), []);
+
   React.useEffect(() => {
     const els = Array.from(document.querySelectorAll(".reveal"));
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -82,6 +98,48 @@ export default function PostProductionPage() {
               Send a file
             </a>
           </div>
+        </div>
+      </section>
+
+      <section className="band" style={{ paddingTop: 0 }} data-screen-label="Audiobook before/after">
+        <div className="container">
+          <div className="reveal">
+            <h2 className="section-title">Recorded at home. Delivered to spec.</h2>
+            <p className="section-sub">
+              A narrator reading in a living room, Samson USB mic about 40 cm away. No
+              treatment, no booth. The kind of file that arrives when recording moves
+              out of the studio. Target: Nordic audiobook catalogue spec, −18 LUFS /
+              −3 dBTP.
+            </p>
+          </div>
+          <div className="demo-grid">
+            <div className="reveal reveal-d1">
+              <DemoCard
+                kind="raw"
+                light
+                playing={playing === "audiobook-raw"}
+                onToggle={() => toggle("audiobook-raw")}
+                title="Before"
+                microcopy="−30.6 LUFS integrated · −13.5 dBTP"
+                tags={[]}
+              />
+            </div>
+            <div className="reveal reveal-d2">
+              <DemoCard
+                kind="mastered"
+                light
+                playing={playing === "audiobook-mastered"}
+                onToggle={() => toggle("audiobook-mastered")}
+                title="After"
+                microcopy="−18.0 LUFS integrated · −3.8 dBTP"
+                tags={[]}
+              />
+            </div>
+          </div>
+          <p className="demo-caption reveal">
+            Twelve and a half decibels of gain, and the room doesn&apos;t come up with it.
+            That&apos;s the part that doesn&apos;t automate itself.
+          </p>
         </div>
       </section>
 
