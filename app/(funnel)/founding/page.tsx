@@ -1,7 +1,14 @@
 import { auth } from "@/auth";
 import { getFoundingCount, getFoundingTierInfo } from "@/lib/founding";
+import type { Metadata } from "next";
 import FoundingCheckoutButton from "./founding-checkout-button";
 import "./founding.css";
+
+export const metadata: Metadata = {
+  title: "Founding — Lifetime Creator Access | Saltwaves",
+  description:
+    "Lock in lifetime Creator access with a one-time payment. Limited to 20 founding members.",
+};
 
 type FoundingPageProps = {
   searchParams: Promise<{
@@ -60,8 +67,8 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
           )}
 
           <p className="founding-tos">
-            Livstid gäller Creator-nivån som den är definierad idag. Gäller ej
-            framtida fristående produkter. RSS-portalen ingår inte.
+            Lifetime applies to the Creator tier as defined today. Does not cover
+            standalone future products. The RSS portal is not included.
           </p>
         </article>
       </div>

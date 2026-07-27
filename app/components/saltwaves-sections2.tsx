@@ -82,7 +82,7 @@ export function ToolsSuite() {
 /* ---------- FAQ ---------- */
 const FAQ_ITEMS = [
   { q: "Do you store my audio files?", a: "We process, deliver, and delete. Uploads go away after processing; mastered files within 48 hours — all plans, pre-v2." },
-  { q: "What file formats are supported?", a: ".wav and .mp3, up to 200 MB on the free tier." },
+  { q: "What file formats are supported?", a: ".wav, .mp3, and .m4a, up to 200 MB on the free tier." },
   { q: "How is this different from Auphonic?", a: "Auphonic runs generic loudness algorithms. PodMaster is trained on real studio sessions curated by a broadcast engineer with 20 years behind the console — it makes the same calls a human would." },
   { q: "Can I use it for music?", a: "PodMaster is built for spoken word — that's the entire point. Episodes with music beds and intros work, but the chain is tuned for voice, not for mastering music releases. If your show is music-heavy, tell us — it helps us prioritize." },
   { q: "How long does processing take?", a: "Typically a few minutes per episode. You upload, we process, and the finished file lands in your inbox — no need to keep the tab open." },

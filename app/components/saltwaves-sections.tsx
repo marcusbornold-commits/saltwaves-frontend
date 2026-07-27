@@ -1,6 +1,8 @@
 "use client";
 // saltwaves-sections.jsx — nav, demo, how-it-works, credibility, pricing, footer
 import React from "react";
+import type { PriceIds } from "@/lib/pricing";
+import SubscriptionCheckoutButton from "./subscription-checkout-button";
 import { Wordmark, WaveBars, VUMeter, demoAudio } from "./saltwaves-ui";
 
 const navItems = [
@@ -336,7 +338,15 @@ function detectCurrency() {
   return "USD";                                                      // everyone else incl. Iceland
 }
 
-export function Pricing({ currency }: any) {
+export function Pricing({
+  currency,
+  isLoggedIn,
+  priceIds,
+}: {
+  currency?: string;
+  isLoggedIn: boolean;
+  priceIds: PriceIds;
+}) {
   const [annual, setAnnual] = React.useState(true);
   // navigator is unavailable during server rendering, so resolve after mount
   const [cur, setCur] = React.useState("USD");
@@ -344,6 +354,7 @@ export function Pricing({ currency }: any) {
     setCur(currency && currency !== "Auto" ? currency : detectCurrency());
   }, [currency]);
   const p = PRICE_TABLE[cur] || PRICE_TABLE.USD;
+  const billing = annual ? "annual" : "monthly";
   const tiers: any[] = [
     {
       name: "Free", m: p.free, y: p.free, per: "forever", badge: "No credit card required",
@@ -351,12 +362,12 @@ export function Pricing({ currency }: any) {
       cta: "Start free",
     },
     {
-      name: "Creator", m: p.creator[0], y: p.creator[1], featured: true, badge: "Most popular",
+      name: "Creator", id: "creator" as const, m: p.creator[0], y: p.creator[1], featured: true, badge: "Most popular",
       items: ["Unlimited episodes", "Priority processing"],
       cta: "Get Creator",
     },
     {
-      name: "Studio", m: p.studio[0], y: p.studio[1],
+      name: "Studio", id: "studio" as const, m: p.studio[0], y: p.studio[1],
       items: ["Everything in Creator", { label: "Batch processing", soon: true }],
       cta: "Get Studio",
     },
@@ -401,7 +412,20 @@ export function Pricing({ currency }: any) {
                   );
                 })}
               </ul>
-              <a className={"btn " + (t.featured ? "btn-primary" : "btn-ghost")} href="#try" style={{ justifyContent: "center" }}>{t.cta}</a>
+              {t.id === "creator" || t.id === "studio" ? (
+                <SubscriptionCheckoutButton
+                  plan={t.id}
+                  billing={billing}
+                  priceIds={priceIds}
+                  isLoggedIn={isLoggedIn}
+                  loginCallbackUrl="/"
+                  className={"btn " + (t.featured ? "btn-primary" : "btn-ghost")}
+                >
+                  {t.cta}
+                </SubscriptionCheckoutButton>
+              ) : (
+                <a className={"btn " + (t.featured ? "btn-primary" : "btn-ghost")} href="#try" style={{ justifyContent: "center" }}>{t.cta}</a>
+              )}
             </article>
           ))}
         </div>
@@ -463,8 +487,8 @@ export function Footer() {
               <h4>Tools</h4>
               <ul>
                 <li><a href="/#try">PodMaster</a></li>
-                <li><a href="/#tools">PrompterMaster</a></li>
-                <li><a href="/#tools">Loudness Inspector</a></li>
+                <li><a href="https://saltwaves.studio/promptermaster">PrompterMaster</a></li>
+                <li><a href="https://saltwaves.studio/podcast-loudness-checker">Loudness Inspector</a></li>
               </ul>
             </div>
             <div className="footer-col">
@@ -487,7 +511,7 @@ export function Footer() {
           </div>
         </div>
         <div className="footer-base microcopy">
-          <span>© 2026 Saltwaves Studio · Marcus Bornold · Org.nr [ORGNUMMER] · F-skatt · Örebro, Sweden</span>
+          <span>© 2026 Saltwaves Studio · Marcus Bornold · F-skatt · Örebro, Sweden</span>
           <span>Mastered, not generated.</span>
         </div>
       </div>

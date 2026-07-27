@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import styles from "../legal.module.css";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Privacy Policy — Saltwaves",
   description:
     "How Saltwaves handles your personal data: what we collect, how long we keep it, and your rights under GDPR.",

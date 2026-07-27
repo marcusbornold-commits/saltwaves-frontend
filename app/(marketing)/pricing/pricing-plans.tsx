@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { startCheckout } from "@/lib/checkout-client";
+import SubscriptionCheckoutButton from "@/app/components/subscription-checkout-button";
 import {
-  getSubscriptionPriceId,
   PRICING_TIERS,
   type BillingPeriod,
   type PlanFeature,
@@ -26,25 +25,7 @@ function isSoon(item: PlanFeature): boolean {
 
 export default function PricingPlans({ isLoggedIn, priceIds }: PricingPlansProps) {
   const [annual, setAnnual] = useState(true);
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const billing: BillingPeriod = annual ? "annual" : "monthly";
-
-  async function handlePaidCheckout(plan: "creator" | "studio") {
-    if (!isLoggedIn) {
-      const callbackUrl = encodeURIComponent("/pricing");
-      window.location.href = `/login?callbackUrl=${callbackUrl}`;
-      return;
-    }
-
-    const priceId = getSubscriptionPriceId(plan, billing, priceIds);
-    setLoadingPlan(plan);
-
-    try {
-      await startCheckout(priceId);
-    } catch {
-      setLoadingPlan(null);
-    }
-  }
 
   return (
     <>
@@ -81,7 +62,6 @@ export default function PricingPlans({ isLoggedIn, priceIds }: PricingPlansProps
           const amount = annual ? tier.annualPrice : tier.monthlyPrice;
           const period = tier.per ?? (annual ? "/year" : "/month");
           const isPaid = tier.id === "creator" || tier.id === "studio";
-          const isLoading = loadingPlan === tier.id;
 
           return (
             <article
@@ -109,16 +89,18 @@ export default function PricingPlans({ isLoggedIn, priceIds }: PricingPlansProps
                 <Link href={tier.href} className="pricing-btn pricing-btn-ghost">
                   {tier.cta}
                 </Link>
-              ) : (
-                <button
-                  type="button"
+              ) : isPaid ? (
+                <SubscriptionCheckoutButton
+                  plan={tier.id as "creator" | "studio"}
+                  billing={billing}
+                  priceIds={priceIds}
+                  isLoggedIn={isLoggedIn}
+                  loginCallbackUrl="/pricing"
                   className={`pricing-btn ${tier.featured ? "pricing-btn-primary" : "pricing-btn-ghost"}`}
-                  disabled={isLoading}
-                  onClick={() => handlePaidCheckout(tier.id as "creator" | "studio")}
                 >
-                  {isLoading ? "Redirecting…" : tier.cta}
-                </button>
-              )}
+                  {tier.cta}
+                </SubscriptionCheckoutButton>
+              ) : null}
             </article>
           );
         })}

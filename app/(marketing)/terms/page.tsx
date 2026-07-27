@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import styles from "../legal.module.css";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Terms of Service — Saltwaves",
   description:
     "Terms governing your use of Saltwaves: plans, availability, liability, and governing law.",

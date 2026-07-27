@@ -3,6 +3,7 @@
 // Ported note: the dev-only Tweaks panel was excluded from this port.
 // The values below are the TWEAK_DEFAULTS the design shipped with.
 import React from "react";
+import type { PriceIds } from "@/lib/pricing";
 import { HeroSplit, HeroWave, HeroConsole } from "./saltwaves-hero";
 import { DemoSection, HowItWorks, Credibility, Pricing } from "./saltwaves-sections";
 import { ToolsSuite, FAQ, FinalCTA } from "./saltwaves-sections2";
@@ -21,7 +22,12 @@ const HEADLINES: any = {
 const SUBLINE =
   "PodMaster cleans the noise, balances the EQ and matches loudness to broadcast spec — tuned by ears with 20 years behind the console.";
 
-export default function App() {
+type AppProps = {
+  isLoggedIn: boolean;
+  priceIds: PriceIds;
+};
+
+export default function App({ isLoggedIn, priceIds }: AppProps) {
   const t = TWEAK_DEFAULTS;
 
   // Reveal-on-scroll (rect-based; no IntersectionObserver dependency)
@@ -64,7 +70,7 @@ export default function App() {
         <HowItWorks />
         <ToolsSuite />
         <Credibility />
-        <Pricing currency={t.currency} />
+        <Pricing currency={t.currency} isLoggedIn={isLoggedIn} priceIds={priceIds} />
         <FAQ />
         <FinalCTA />
       </main>

@@ -1,7 +1,14 @@
 import { auth } from "@/auth";
 import { getPriceIdsFromEnv } from "@/lib/pricing";
+import type { Metadata } from "next";
 import PricingPlans from "./pricing-plans";
 import "./pricing.css";
+
+export const metadata: Metadata = {
+  title: "Pricing — PodMaster by Saltwaves",
+  description:
+    "Start free with 3 episodes a month. Upgrade to Creator or Studio for unlimited processing and priority delivery.",
+};
 
 type PricingPageProps = {
   searchParams: Promise<{

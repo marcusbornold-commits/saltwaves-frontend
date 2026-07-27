@@ -5,7 +5,7 @@ import { UploadZone, WaveBars, VUMeter } from "./saltwaves-ui";
 
 const heroCommon = {
   ctaLabel: "Try it free",
-  micro: "Free · No account needed · .wav / .mp3",
+  micro: "Free · No account needed · .wav / .mp3 / .m4a",
 };
 
 function HeroCTA({ onTry }: any) {

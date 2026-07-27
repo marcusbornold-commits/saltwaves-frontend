@@ -2,15 +2,13 @@ import type { Metadata } from "next";
 import ServicesPage from "../../components/services-page";
 
 export const metadata: Metadata = {
-  title: "Konsulttjänster – Fast pris, fast leverans | Saltwaves.studio",
+  title: "Consulting — Fixed-price live & streaming setups | Saltwaves",
   description:
-    "Tre paket för live- och streamingproduktion till fast pris: streaming-setup, produktionsdashboard och automationsflöden. Byggda av en ljudtekniker med 20 år i broadcast, TV och live-ljud.",
-  keywords:
-    "streaming setup, OBS, vMix, Bitfocus Companion, Stream Deck, NDI, liveproduktion, broadcast, konsulttjänster",
+    "Fixed-price packages for streaming setup, production dashboards, and automation workflows. Built by a broadcast engineer with 20 years in TV and live sound.",
   openGraph: {
-    title: "Konsulttjänster – Fast pris, fast leverans | Saltwaves.studio",
+    title: "Consulting — Fixed-price live & streaming setups | Saltwaves",
     description:
-      "Streaming-setup, produktionsdashboard och automationsflöden till fast pris. Leverans på 3 dagar till 2 veckor.",
+      "Streaming setup, production dashboards, and automation workflows at a fixed price. Delivery in 3 days to 2 weeks.",
     type: "website",
   },
 };
