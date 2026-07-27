@@ -59,7 +59,6 @@ export const PRICING_TIERS: PricingTier[] = [
     items: [
       "Everything in Creator",
       { label: "Batch processing", soon: true },
-      { label: "API access", soon: true },
     ],
     cta: "Get Studio",
   },
