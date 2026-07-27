@@ -11,7 +11,7 @@ type FoundingPageProps = {
 
 const FOUNDING_FEATURES = [
   "Lifetime Creator plan",
-  "Unlimited episodes",
+  "10 hours of processing per month",
   "Priority processing",
   "Founding member badge",
 ];
@@ -32,7 +32,7 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
         <div className="founding-kicker">Founding presale</div>
         <h1 className="founding-title">Lock in lifetime Creator access.</h1>
         <p className="founding-sub">
-          One-time payment. Limited to 100 founding members — tier pricing increases as spots fill.
+          One-time payment. Limited to 20 founding members — tier pricing increases as spots fill.
         </p>
 
         <article className={`founding-card${tierInfo.soldOut ? " sold-out" : ""}`}>
@@ -47,7 +47,7 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
           </ul>
 
           {tierInfo.soldOut ? (
-            <p className="founding-sold-out-msg">Alla 100 platser sålda</p>
+            <p className="founding-sold-out-msg">Alla 20 platser sålda</p>
           ) : (
             <FoundingCheckoutButton
               tier={tierInfo.tier}
@@ -60,7 +60,8 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
           )}
 
           <p className="founding-tos">
-            Lifetime Creator-plan. Gäller ej framtida fristående produkter.
+            Livstid gäller Creator-nivån som den är definierad idag. Gäller ej
+            framtida fristående produkter. RSS-portalen ingår inte.
           </p>
         </article>
       </div>

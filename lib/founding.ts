@@ -64,7 +64,7 @@ export async function getFoundingCount(): Promise<number> {
 }
 
 export function getFoundingTierInfo(sold: number): FoundingTierInfo {
-  if (sold >= 100) {
+  if (sold >= 20) {
     return {
       tier: "sold_out",
       priceDisplay: null,
@@ -72,7 +72,7 @@ export function getFoundingTierInfo(sold: number): FoundingTierInfo {
       spotLabel: null,
       soldOut: true,
       sold,
-      total: 100,
+      total: 20,
     };
   }
 
@@ -86,10 +86,10 @@ export function getFoundingTierInfo(sold: number): FoundingTierInfo {
       tier: "t1",
       priceDisplay: "$129",
       priceId,
-      spotLabel: `Plats ${sold + 1} av 50`,
+      spotLabel: `Plats ${sold + 1} av 20`,
       soldOut: false,
       sold,
-      total: 100,
+      total: 20,
     };
   }
 
@@ -102,9 +102,9 @@ export function getFoundingTierInfo(sold: number): FoundingTierInfo {
     tier: "t2",
     priceDisplay: "$149",
     priceId,
-    spotLabel: `Plats ${sold + 1} av 100`,
+    spotLabel: `Plats ${sold + 1} av 20`,
     soldOut: false,
     sold,
-    total: 100,
+    total: 20,
   };
 }
