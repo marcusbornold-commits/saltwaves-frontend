@@ -5,11 +5,11 @@ import { Wordmark, WaveBars, VUMeter, demoAudio } from "./saltwaves-ui";
 
 const navItems = [
   { href: "/#demo", label: "Hear it" },
-  { href: "/services", label: "Consulting" },
-  { href: "/#tools", label: "Tools" },
+  { href: "/services", label: "Post-production" },
+  { href: "/tjanster", label: "Consulting" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/founding", label: "Founding", highlight: true },
   { href: "/#faq", label: "FAQ" },
+  { href: "/founding", label: "Founding", highlight: true },
 ];
 
 export function Nav({ dark }: any) {
@@ -317,7 +317,7 @@ export function Pricing({ currency }: any) {
     },
     {
       name: "Studio", m: p.studio[0], y: p.studio[1],
-      items: ["Everything in Creator", { label: "Batch processing", soon: true }, { label: "API access", soon: true }],
+      items: ["Everything in Creator", { label: "Batch processing", soon: true }],
       cta: "Get Studio",
     },
   ];
@@ -422,18 +422,18 @@ export function Footer() {
             <div className="footer-col">
               <h4>Tools</h4>
               <ul>
-                <li><a href="#try">PodMaster</a></li>
-                <li><a href="#tools">PrompterMaster</a></li>
-                <li><a href="#tools">Loudness Inspector</a></li>
+                <li><a href="/#try">PodMaster</a></li>
+                <li><a href="/#tools">PrompterMaster</a></li>
+                <li><a href="/#tools">Loudness Inspector</a></li>
               </ul>
             </div>
             <div className="footer-col">
               <h4>Company</h4>
               <ul>
-                <li><a href="#about">About</a></li>
-                <li><a href="#blog">Blog</a></li>
+                <li><a href="/#about">About</a></li>
                 <li><a href="/founding">Founding</a></li>
-                <li><a href="/services">Consulting</a></li>
+                <li><a href="/services">Post-production</a></li>
+                <li><a href="/tjanster">Consulting</a></li>
                 <li><a href="mailto:hello@saltwaves.studio">Contact</a></li>
               </ul>
             </div>
@@ -447,7 +447,7 @@ export function Footer() {
           </div>
         </div>
         <div className="footer-base microcopy">
-          <span>© 2026 Saltwaves.studio · Marcus Bornold · Örebro, Sweden</span>
+          <span>© 2026 Saltwaves Studio · Marcus Bornold · Org.nr [ORGNUMMER] · F-skatt · Örebro, Sweden</span>
           <span>Mastered, not generated.</span>
         </div>
       </div>

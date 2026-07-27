@@ -1,5 +1,6 @@
 // app/tools/ab-analyzer/page.tsx
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import AbAnalyzer from "./AbAnalyzer";
 
 export const metadata: Metadata = {
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <AbAnalyzer />;
+  return (
+    <Suspense fallback={null}>
+      <AbAnalyzer />
+    </Suspense>
+  );
 }

@@ -73,12 +73,6 @@ export function ToolsSuite() {
               href="https://saltwaves.studio/podcast-loudness-checker"
             />
           </div>
-          <div className="reveal reveal-d2" style={{ display: "grid" }}>
-            <ToolCard soon name="AudioFixer" desc="Audio restoration for video creators." tag="in the workshop" />
-          </div>
-          <div className="reveal reveal-d3" style={{ display: "grid" }}>
-            <ToolCard soon name="MeetingMaster" desc="Post-processing for recorded meetings." tag="in the workshop" />
-          </div>
         </div>
       </div>
     </section>

@@ -5,7 +5,7 @@
 import React from "react";
 import { HeroSplit, HeroWave, HeroConsole } from "./saltwaves-hero";
 import { DemoSection, HowItWorks, Credibility, Pricing } from "./saltwaves-sections";
-import { ToolsSuite, FAQ, BlogTeaser, FinalCTA } from "./saltwaves-sections2";
+import { ToolsSuite, FAQ, FinalCTA } from "./saltwaves-sections2";
 
 const TWEAK_DEFAULTS: any = {
   "hero": "Wave",
@@ -66,7 +66,6 @@ export default function App() {
         <Credibility />
         <Pricing currency={t.currency} />
         <FAQ />
-        <BlogTeaser />
         <FinalCTA />
       </main>
     </React.Fragment>
