@@ -13,7 +13,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Which mic type should I pick?",
-    a: "Dynamic — SM7B, Samson Q2U, and similar broadcast mics. Condenser — Blue Yeti, AT2020, and studio condensers. Headset / AirPods — built-in or wireless headset mics (we skip heavy AI cleanup). Multiple mics / Not sure — safe default when you're unsure.",
+    a: "Dynamic — SM7B, Samson Q2U, and similar broadcast mics. Condenser — Blue Yeti, AT2020, and studio condensers. Headset / AirPods — built-in or wireless headset mics (EQ and loudness only). Multiple mics / Not sure — safe default when you're unsure.",
   },
   {
     q: "How long are my files kept?",

@@ -261,6 +261,24 @@ header.nav {
 }
 .nav-mobile-menu a:not(.text-ink) { opacity: 0.78; }
 .nav-mobile-menu a:not(.text-ink):hover { opacity: 1; color: var(--orange); }
+.nav-links a.nav-founding,
+.nav-mobile-menu a.nav-founding {
+  opacity: 1;
+  color: var(--orange);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--orange);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+.nav-mobile-menu a.nav-founding {
+  display: inline-block;
+  padding: 8px 14px;
+  margin: 6px 0;
+}
 .nav-dark .nav-mobile-menu { border-top-color: var(--line-dark); background: color-mix(in srgb, var(--ink) 94%, transparent); }
 .nav-dark .text-ink { color: var(--paper); }
 @media (max-width: 760px) {
@@ -465,6 +483,27 @@ header.nav {
 @keyframes vuflick { from { opacity: 1; } to { opacity: 0.45; } }
 
 /* Pricing */
+.founding-pricing-banner {
+  display: block;
+  margin-top: 28px;
+  padding: 11px 18px;
+  text-align: center;
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--line));
+  border-radius: 10px;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.founding-pricing-banner:hover {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+}
+.founding-pricing-banner + .pricing-grid { margin-top: 20px; }
 .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 56px; align-items: stretch; }
 @media (max-width: 900px) { .pricing-grid { grid-template-columns: 1fr; max-width: 440px; margin-left: auto; margin-right: auto; } }
 .price-card {

@@ -5,9 +5,10 @@ import { Wordmark, WaveBars, VUMeter, demoAudio } from "./saltwaves-ui";
 
 const navItems = [
   { href: "/#demo", label: "Hear it" },
-  { href: "/services", label: "How it works" },
+  { href: "/services", label: "Consulting" },
   { href: "/#tools", label: "Tools" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/founding", label: "Founding", highlight: true },
   { href: "/#faq", label: "FAQ" },
 ];
 
@@ -21,7 +22,11 @@ export function Nav({ dark }: any) {
         <nav aria-label="Main">
           <ul className="nav-links">
             {navItems.map((item) => (
-              <li key={item.href}><a href={item.href}>{item.label}</a></li>
+              <li key={item.href}>
+                <a href={item.href} className={item.highlight ? "nav-founding" : undefined}>
+                  {item.label}
+                </a>
+              </li>
             ))}
           </ul>
         </nav>
@@ -61,7 +66,13 @@ export function Nav({ dark }: any) {
         <ul>
           {navItems.map((item) => (
             <li key={item.href}>
-              <a href={item.href} onClick={() => setMenuOpen(false)}>{item.label}</a>
+              <a
+                href={item.href}
+                className={item.highlight ? "nav-founding" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
+                {item.label}
+              </a>
             </li>
           ))}
           <li>
@@ -208,8 +219,6 @@ export function HowItWorks() {
 /* ---------- Credibility + testimonials ---------- */
 const TESTIMONIALS = [
   { quote: "Saltwaves is a really smooth tool that makes a clear difference right away. Excited to follow where this goes!", who: "Jonatan Samuelsson · Adora, Narnia", avatar: "/testimonials/jonatan.jpg", alt: "Jonatan Samuelsson" },
-  { quote: "Placeholder — beta feedback goes here. Something specific: noise floor, loudness, the time it saved.", who: "Beta tester · show name" },
-  { quote: "Placeholder — beta feedback goes here. Why they stopped fiddling with plugins and just upload now.", who: "Beta tester · show name" },
 ];
 
 export function Credibility() {
@@ -222,7 +231,7 @@ export function Credibility() {
               Built by a sound engineer with 20 years behind the console — <em>not scraped data.</em>
             </p>
             <p className="section-sub" style={{ marginTop: 22 }}>
-              Live sound. Broadcast. TV. Streaming. That experience is baked into every decision the AI makes.
+              Live sound. Broadcast. TV. Streaming. That experience is baked into every decision the chain makes.
             </p>
             <div className="cred-meta">
               <span className="cred-chip">FOH · live sound</span>
@@ -237,9 +246,17 @@ export function Credibility() {
             <VUMeter lit={13} total={16} />
           </div>
         </div>
-        <div className="testi-grid" data-status="hidden">
+        <div
+          className="testi-grid"
+          data-status="hidden"
+          style={{ gridTemplateColumns: "1fr", justifyItems: "center" }}
+        >
           {TESTIMONIALS.map((t, i) => (
-            <article className={"testi-card reveal reveal-d" + (i + 1)} key={i}>
+            <article
+              className={"testi-card reveal reveal-d" + (i + 1)}
+              key={i}
+              style={{ maxWidth: 480, width: "100%" }}
+            >
               <p className="testi-quote">“{t.quote}”</p>
               <div className="testi-who">
                 {t.avatar ? (
@@ -320,6 +337,9 @@ export function Pricing({ currency }: any) {
             <span className="save-pill">save 2 months</span>
           </div>
         </div>
+        <a href="/founding" className="founding-pricing-banner reveal">
+          Founding — lifetime access to Creator, limited to 20 seats
+        </a>
         <div className="pricing-grid">
           {tiers.map((t, i) => (
             <article className={"price-card reveal reveal-d" + (i + 1) + (t.featured ? " featured" : "")} key={t.name}>
@@ -390,7 +410,7 @@ export function Footer() {
           <div>
             <img src="/assets/logo-full.png" alt="Saltwaves.studio" />
             <p className="microcopy" style={{ marginTop: 18, maxWidth: "32ch" }}>
-              AI audio tools, built with an engineer's ears.
+              Broadcast-trained processing. Built by an engineer&apos;s ears.
             </p>
             <div className="footer-social">
               <a href="https://www.linkedin.com/in/marcus-bornold-9152a3407/" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><SocialIcon kind="linkedin" /></a>
@@ -412,15 +432,16 @@ export function Footer() {
               <ul>
                 <li><a href="#about">About</a></li>
                 <li><a href="#blog">Blog</a></li>
-                <li><a href="/services">Custom Services</a></li>
+                <li><a href="/founding">Founding</a></li>
+                <li><a href="/services">Consulting</a></li>
                 <li><a href="mailto:hello@saltwaves.studio">Contact</a></li>
               </ul>
             </div>
             <div className="footer-col">
               <h4>Legal</h4>
               <ul>
-                <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Terms of Service</a></li>
+                <li><a href="/privacy">Privacy Policy</a></li>
+                <li><a href="/terms">Terms of Service</a></li>
               </ul>
             </div>
           </div>
