@@ -37,7 +37,7 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
 
         <article className={`founding-card${tierInfo.soldOut ? " sold-out" : ""}`}>
           <p className="founding-counter">
-            {tierInfo.sold} / {tierInfo.total} sålda
+            {tierInfo.sold} / {tierInfo.total} claimed
           </p>
 
           <ul className="founding-features">
@@ -47,7 +47,7 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
           </ul>
 
           {tierInfo.soldOut ? (
-            <p className="founding-sold-out-msg">Alla 20 platser sålda</p>
+            <p className="founding-sold-out-msg">All 20 spots claimed</p>
           ) : (
             <FoundingCheckoutButton
               tier={tierInfo.tier}

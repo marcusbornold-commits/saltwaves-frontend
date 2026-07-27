@@ -446,6 +446,35 @@ header.nav {
 }
 .is-mastered .demo-tag { border-color: rgba(255, 98, 0, 0.45); color: var(--orange); }
 
+/* Demo cards — light layout (e.g. /services) */
+.demo-card.demo-light {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  color: var(--ink);
+}
+.demo-card.demo-light:hover { border-color: rgba(26, 26, 26, 0.28); }
+.demo-card.demo-light.is-mastered:hover { border-color: rgba(255, 98, 0, 0.5); }
+.demo-card.demo-light .play-raw {
+  border-color: rgba(26, 26, 26, 0.35);
+  color: var(--ink);
+}
+.demo-card.demo-light .play-raw:hover { border-color: var(--ink); }
+.demo-card.demo-light .demo-tag {
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+.demo-card.demo-light.is-mastered .demo-tag {
+  border-color: rgba(255, 98, 0, 0.45);
+  color: var(--orange);
+}
+.demo-caption {
+  margin-top: 22px;
+  max-width: 52ch;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
 /* Steps */
 .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 56px; }
 @media (max-width: 800px) { .steps-grid { grid-template-columns: 1fr; } }

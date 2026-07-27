@@ -85,10 +85,51 @@ export function Nav({ dark }: any) {
 }
 
 /* ---------- Before / after demo ---------- */
-function DemoCard({ kind, playing, onToggle }: any) {
+type DemoCardProps = {
+  kind: "raw" | "mastered";
+  playing: boolean;
+  onToggle: () => void;
+  title?: string;
+  microcopy?: string;
+  tags?: string[];
+  waveColor?: string;
+  light?: boolean;
+};
+
+export function DemoCard({
+  kind,
+  playing,
+  onToggle,
+  title,
+  microcopy,
+  tags,
+  waveColor,
+  light = false,
+}: DemoCardProps) {
   const mastered = kind === "mastered";
+  const resolvedTitle = title ?? (mastered ? "After — PodMaster" : "Before — raw recording");
+  const resolvedMicro = microcopy ?? (mastered ? "one pass, 60 seconds" : "straight off the mic");
+  const resolvedTags =
+    tags ??
+    (mastered
+      ? ["noise removed", "EQ balanced", "-16 LUFS"]
+      : ["room noise", "uneven levels", "-31 LUFS"]);
+  const resolvedWave =
+    waveColor ??
+    (mastered
+      ? "var(--orange)"
+      : light
+        ? "rgba(26,26,26,0.35)"
+        : "rgba(241,237,232,0.45)");
+
   return (
-    <article className={"demo-card" + (mastered ? " is-mastered" : "")}>
+    <article
+      className={
+        "demo-card" +
+        (mastered ? " is-mastered" : "") +
+        (light ? " demo-light" : "")
+      }
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22 }}>
         <button
           className={"play-btn " + (mastered ? "play-mastered" : "play-raw")}
@@ -107,8 +148,8 @@ function DemoCard({ kind, playing, onToggle }: any) {
           )}
         </button>
         <div>
-          <h3 style={{ fontSize: 21 }}>{mastered ? "After — PodMaster" : "Before — raw recording"}</h3>
-          <span className="microcopy">{mastered ? "one pass, 60 seconds" : "straight off the mic"}</span>
+          <h3 style={{ fontSize: 21 }}>{resolvedTitle}</h3>
+          <span className="microcopy">{resolvedMicro}</span>
         </div>
       </div>
       <WaveBars
@@ -117,16 +158,15 @@ function DemoCard({ kind, playing, onToggle }: any) {
         height={64}
         playing={playing}
         flat={mastered ? 1 : 0.45}
-        color={mastered ? "var(--orange)" : "rgba(241,237,232,0.45)"}
+        color={resolvedWave}
       />
-      <div className="demo-tags">
-        {(mastered
-          ? ["noise removed", "EQ balanced", "-16 LUFS"]
-          : ["room noise", "uneven levels", "-31 LUFS"]
-        ).map((t) => (
-          <span className="demo-tag" key={t}>{t}</span>
-        ))}
-      </div>
+      {resolvedTags.length > 0 && (
+        <div className="demo-tags">
+          {resolvedTags.map((t) => (
+            <span className="demo-tag" key={t}>{t}</span>
+          ))}
+        </div>
+      )}
     </article>
   );
 }

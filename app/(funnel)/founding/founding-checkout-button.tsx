@@ -25,7 +25,7 @@ export default function FoundingCheckoutButton({
   const [loading, setLoading] = useState(false);
 
   if (soldOut) {
-    return <p className="founding-sold-out-msg">Alla 20 platser sålda</p>;
+    return <p className="founding-sold-out-msg">All 20 spots claimed</p>;
   }
 
   async function handleClick() {

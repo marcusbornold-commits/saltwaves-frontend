@@ -350,6 +350,8 @@ export const demoAudio = (() => {
   const sources: Record<string, string> = {
     raw: "/hero/hero_before.mp3",
     mastered: "/hero/hero_after.mp3",
+    "audiobook-raw": "/hero/hero_before.mp3",
+    "audiobook-mastered": "/hero/hero_after_audiobook.mp3",
   };
   let current: HTMLAudioElement | null = null;
   let onEndCb: (() => void) | null = null;
