@@ -17,6 +17,32 @@ There is no test framework in this repo. `npm run build` is the verification ste
 
 Env vars live in `.env.local` (gitignored); `.env.example` lists every key. Missing Stripe/Supabase keys throw at call time, not at boot — `getStripe()`, `getSupabaseAdmin()`, and `getPriceIdsFromEnv()` all lazily validate and throw, so a page that renders pricing will 500 rather than degrade if price IDs are unset.
 
+## Deploy rules
+
+This repo is the Vercel project **saltwaves-services** (`.vercel/project.json`). The git remote is `saltwaves-frontend` on GitHub — pushing there does **not** deploy anything.
+
+- Deploy only manually, with `vercel --prod`. There is no Git autodeploy on this project.
+- Committing straight to `main` is fine here, precisely because deploys are manual — a commit, and even a push, reaches nobody until someone runs `vercel --prod`. No feature branch needed for ordinary work.
+- `saltwaves-site` is a **separate** repo that *does* have Git autodeploy — a push to `main` there goes straight to production. The rule above does not apply to it.
+- Never use `git add -A`. Stage files by explicit name.
+- Run `git log --oneline -5` and `git status --short` before every commit.
+- `NEXT_PUBLIC_*` variables must exist in Vercel *before* the build, and must **not** be marked Sensitive (they are inlined at build time; Sensitive makes them unreadable to the build).
+- After deploying, verify the deployed commit hash in the Vercel dashboard before assuming anything is live.
+
+## Limits on autonomous changes
+
+Never change these on your own. Flag them with an explanation and a proposal, and wait for explicit approval:
+
+- Anything Stripe: products, prices, webhooks, the checkout flow.
+- `scripts/retention_sweep.sh` and all GDPR deletion logic. The 48-hour window is deliberate positioning, not a bug to "fix". (Lives in the backend repo — `scripts/` is empty here.)
+- Auth: NextAuth and Supabase auth tokens. Authenticated upload returning 403 is a **known** JWE-vs-Supabase-token mismatch — do not "fix" it without discussion.
+- The audio pipeline's order and parameters (DFN → highpass → EQ → gate → compressors → de-esser → limiter → loudnorm) and the loudnorm targets (I = −19 mono / −16 stereo, TP = −1.0, LRA = 50). Backend repo; treat any value mirrored in UI copy here as read-only.
+- Pricing, the Founding cap (20 spots), and anything on `/founding` that is a business term.
+
+For everything else — code quality, bugs, dead features, inconsistencies with the conventions below, missing error handling — find *and* propose the fix in the same step, but show a plan or diff before committing anything.
+
+If unsure whether something belongs on this list: ask, don't guess.
+
 ## Architecture
 
 Next.js 16 App Router + React 19, TypeScript strict, deployed on Vercel. No CSS framework, no state library, no ORM — plain CSS and direct SDK calls.
