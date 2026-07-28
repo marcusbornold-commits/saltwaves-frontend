@@ -26,13 +26,18 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   const { checkout } = await searchParams;
 
-  const { data: profile } = await getSupabaseAdmin()
+  const { data: profile, error: profileError } = await getSupabaseAdmin()
     .from("profiles")
     .select(
       "subscription_status, lifetime_creator, founding_member_tier, current_period_end, stripe_customer_id",
     )
     .eq("id", session.user.id)
     .maybeSingle();
+
+  if (profileError) {
+    // Falling through would render "Free" to a paying customer.
+    console.error("Failed to fetch profile for account page:", profileError.message);
+  }
 
   const isLifetime = profile?.lifetime_creator === true;
   const subscriptionStatus = profile?.subscription_status as string | null;
@@ -78,16 +83,26 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           <h1 className="login-title">Your account</h1>
           <p className="login-sub">{session.user.email}</p>
 
-          <div className="plan-card">
-            <div className="plan-row">
-              <span className="plan-name">{planName}</span>
-              {planBadge && <span className="plan-badge">{planBadge}</span>}
+          {profileError ? (
+            <div className="account-banner is-error">
+              We couldn&apos;t load your plan details right now. Refresh the page —
+              if it keeps happening, email hello@saltwaves.studio and we&apos;ll
+              sort it out.
             </div>
-            {planMeta && <p className="plan-meta">{planMeta}</p>}
-          </div>
+          ) : (
+            <div className="plan-card">
+              <div className="plan-row">
+                <span className="plan-name">{planName}</span>
+                {planBadge && <span className="plan-badge">{planBadge}</span>}
+              </div>
+              {planMeta && <p className="plan-meta">{planMeta}</p>}
+            </div>
+          )}
 
           <div className="account-actions">
-            {stripeCustomerId ? (
+            {/* Both actions depend on the profile — offering either after a failed
+                read would be a guess about what the user has paid for. */}
+            {profileError ? null : stripeCustomerId ? (
               <ManageBillingButton />
             ) : (
               <a href="/pricing" className="btn-primary-full">

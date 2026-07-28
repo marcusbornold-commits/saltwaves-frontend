@@ -103,6 +103,14 @@
   margin-bottom: 28px;
 }
 
+.account-banner.is-error {
+  border-color: rgba(26, 26, 26, 0.3);
+  background: #faf8f4;
+  color: rgba(26, 26, 26, 0.75);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
 .plan-card {
   border: 1.5px solid rgba(26, 26, 26, 0.14);
   background: #faf8f4;
