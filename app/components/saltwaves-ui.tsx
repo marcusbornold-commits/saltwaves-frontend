@@ -355,6 +355,11 @@ export const demoAudio = (() => {
   };
   let current: HTMLAudioElement | null = null;
   let onEndCb: (() => void) | null = null;
+  // Bumped on every stop(), and so on every play() too. play() returns a promise
+  // that rejects when the clip is paused before playback starts — which is exactly
+  // what a fast A/B toggle does. Without this token that stale rejection would
+  // stop the clip that replaced it and fire the previous onEnd.
+  let generation = 0;
 
   function handleEnded() {
     const cb = onEndCb;
@@ -363,6 +368,7 @@ export const demoAudio = (() => {
   }
 
   function stop() {
+    generation++;
     if (!current) return;
     current.pause();
     current.currentTime = 0;
@@ -373,11 +379,14 @@ export const demoAudio = (() => {
 
   function play(kind: string, onEnd?: () => void) {
     stop();
+    const mine = generation;
     const audio = new Audio(sources[kind]);
     onEndCb = onEnd ?? null;
     current = audio;
     audio.addEventListener("ended", handleEnded);
     audio.play().catch(() => {
+      // Superseded while starting up: a newer clip owns the state now.
+      if (mine !== generation) return;
       stop();
       onEnd?.();
     });
