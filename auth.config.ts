@@ -5,18 +5,10 @@ export const authConfig = {
     signIn: "/login",
     verifyRequest: "/verify-request",
   },
+  // No `authorized` callback: it is only ever invoked by the proxy/middleware
+  // wrapper, and there is none. Protected pages call auth() and redirect
+  // themselves — see app/(app)/account/page.tsx.
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
-      const pathname = nextUrl.pathname;
-      const isProtected =
-        pathname.startsWith("/dashboard") || pathname.startsWith("/app");
-
-      if (!isProtected) {
-        return true;
-      }
-
-      return !!auth?.user;
-    },
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
