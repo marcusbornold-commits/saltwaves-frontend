@@ -1,5 +1,6 @@
 import { auth, signOut } from "@/auth";
 import ManageBillingButton from "@/components/ManageBillingButton";
+import TrainingConsentToggle from "@/components/TrainingConsentToggle";
 import { Nav } from "@/app/components/saltwaves-sections";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
@@ -26,17 +27,59 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   const { checkout } = await searchParams;
 
-  const { data: profile, error: profileError } = await getSupabaseAdmin()
-    .from("profiles")
-    .select(
-      "subscription_status, lifetime_creator, founding_member_tier, current_period_end, stripe_customer_id",
-    )
-    .eq("id", session.user.id)
-    .maybeSingle();
+  const supabase = getSupabaseAdmin();
 
-  if (profileError) {
-    // Falling through would render "Free" to a paying customer.
-    console.error("Failed to fetch profile for account page:", profileError.message);
+  let profile: {
+    subscription_status: string | null;
+    lifetime_creator: boolean | null;
+    founding_member_tier: number | null;
+    current_period_end: string | null;
+    stripe_customer_id: string | null;
+    training_data_consent: boolean | null;
+  } | null = null;
+  let profileError: { message: string } | null = null;
+
+  {
+    const result = await supabase
+      .from("profiles")
+      .select(
+        "subscription_status, lifetime_creator, founding_member_tier, current_period_end, stripe_customer_id, training_data_consent",
+      )
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (
+      result.error &&
+      /training_data_consent/i.test(result.error.message)
+    ) {
+      // Column not applied yet — load billing fields only; treat consent as opt-out.
+      const fallback = await supabase
+        .from("profiles")
+        .select(
+          "subscription_status, lifetime_creator, founding_member_tier, current_period_end, stripe_customer_id",
+        )
+        .eq("id", session.user.id)
+        .maybeSingle();
+      if (fallback.error) {
+        profileError = fallback.error;
+        console.error(
+          "Failed to fetch profile for account page:",
+          fallback.error.message,
+        );
+      } else {
+        profile = fallback.data
+          ? { ...fallback.data, training_data_consent: null }
+          : null;
+      }
+    } else if (result.error) {
+      profileError = result.error;
+      console.error(
+        "Failed to fetch profile for account page:",
+        result.error.message,
+      );
+    } else {
+      profile = result.data;
+    }
   }
 
   const isLifetime = profile?.lifetime_creator === true;
@@ -44,6 +87,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const foundingTier = profile?.founding_member_tier as number | null;
   const currentPeriodEnd = profile?.current_period_end as string | null;
   const stripeCustomerId = profile?.stripe_customer_id as string | null;
+  // null / missing / false = opt-out; only explicit true is consented.
+  const trainingDataConsent = profile?.training_data_consent === true;
 
   let planName = "Free";
   let planBadge: string | null = null;
@@ -97,6 +142,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               </div>
               {planMeta && <p className="plan-meta">{planMeta}</p>}
             </div>
+          )}
+
+          {!profileError && (
+            <TrainingConsentToggle initialConsent={trainingDataConsent} />
           )}
 
           <div className="account-actions">

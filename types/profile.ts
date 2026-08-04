@@ -8,4 +8,6 @@ export type Profile = {
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
   stripe_customer_id: string | null;
+  /** Opt-in: uploaded audio may be used to improve the pipeline. null/false = not consented. */
+  training_data_consent?: boolean | null;
 };
