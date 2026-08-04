@@ -1,4 +1,11 @@
 import { auth } from "@/auth";
+import { getAccess } from "@/lib/access";
+import {
+  exceedsFileSize,
+  fileSizeError,
+  FREE_ACCESS,
+  type AccessLevel,
+} from "@/lib/access-limits";
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 
@@ -67,6 +74,35 @@ export async function POST(request: Request) {
           "This doesn't look like an audio file we can read. We support WAV, MP3, and M4A.",
       },
       { status: 400 },
+    );
+  }
+
+  // Unlike the homepage, this does not quietly fall back to free limits on a
+  // failed read: rejecting a Studio customer's file with "the limit on the Free
+  // plan" would be a confident lie. Fail loudly instead.
+  let access: AccessLevel = FREE_ACCESS;
+  if (session?.user?.id) {
+    try {
+      access = await getAccess(session.user.id);
+    } catch (error) {
+      console.error("Could not resolve plan for upload:", error);
+      return NextResponse.json(
+        {
+          error_code: "plan_unavailable",
+          message: "We couldn't verify your plan just now — try again in a moment.",
+        },
+        { status: 503 },
+      );
+    }
+  }
+
+  if (exceedsFileSize(access, file.size)) {
+    return NextResponse.json(
+      {
+        error_code: "file_too_large",
+        message: fileSizeError(access, file.size),
+      },
+      { status: 413 },
     );
   }
 

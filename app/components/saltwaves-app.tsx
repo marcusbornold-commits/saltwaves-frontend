@@ -3,6 +3,7 @@
 // Ported note: the dev-only Tweaks panel was excluded from this port.
 // The values below are the TWEAK_DEFAULTS the design shipped with.
 import React from "react";
+import type { AccessLevel } from "@/lib/access-limits";
 import type { PriceIds } from "@/lib/pricing";
 import { HeroSplit, HeroWave, HeroConsole } from "./saltwaves-hero";
 import { DemoSection, HowItWorks, Credibility, Pricing } from "./saltwaves-sections";
@@ -25,9 +26,10 @@ const SUBLINE =
 type AppProps = {
   isLoggedIn: boolean;
   priceIds: PriceIds;
+  access: AccessLevel;
 };
 
-export default function App({ isLoggedIn, priceIds }: AppProps) {
+export default function App({ isLoggedIn, priceIds, access }: AppProps) {
   const t = TWEAK_DEFAULTS;
 
   // Reveal-on-scroll (rect-based; no IntersectionObserver dependency)
@@ -63,9 +65,9 @@ export default function App({ isLoggedIn, priceIds }: AppProps) {
     <React.Fragment>
       <a id="top"></a>
       <main>
-        {t.hero === "Split" && <HeroSplit headline={headline} subline={SUBLINE} />}
-        {t.hero === "Wave" && <HeroWave headline={headline} subline={SUBLINE} motion={t.motion} />}
-        {t.hero === "Console" && <HeroConsole headline={headline} subline={SUBLINE} />}
+        {t.hero === "Split" && <HeroSplit headline={headline} subline={SUBLINE} access={access} />}
+        {t.hero === "Wave" && <HeroWave headline={headline} subline={SUBLINE} motion={t.motion} access={access} />}
+        {t.hero === "Console" && <HeroConsole headline={headline} subline={SUBLINE} access={access} />}
         <DemoSection />
         <HowItWorks />
         <ToolsSuite />

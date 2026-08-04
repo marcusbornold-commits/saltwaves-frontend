@@ -1,3 +1,12 @@
+import {
+  durationError,
+  exceedsDuration,
+  exceedsFileSize,
+  fileSizeError,
+  FREE_ACCESS,
+  type AccessLevel,
+} from "@/lib/access-limits";
+
 export type MicType = "dynamic" | "condenser" | "headset" | "unknown";
 
 export type UploadResult = {
@@ -19,11 +28,25 @@ export async function uploadAudio(
   file: File,
   micType: MicType = "unknown",
   email = "",
+  // Same table the API route enforces against — see lib/access-limits.ts.
+  access: AccessLevel = FREE_ACCESS,
+  durationSeconds: number | null = null,
 ): Promise<UploadResult> {
   if (!/\.(wav|mp3|m4a)$/i.test(file.name)) {
     throw new UploadError(
       "This doesn't look like an audio file we can read. We support WAV, MP3, and M4A.",
       "invalid_file_type",
+    );
+  }
+
+  if (exceedsFileSize(access, file.size)) {
+    throw new UploadError(fileSizeError(access, file.size), "file_too_large");
+  }
+
+  if (durationSeconds !== null && exceedsDuration(access, durationSeconds)) {
+    throw new UploadError(
+      durationError(access, durationSeconds),
+      "episode_too_long",
     );
   }
 

@@ -1,7 +1,13 @@
 "use client";
 // saltwaves-ui.jsx — shared primitives: wordmark, upload zone, wave bars, VU meter, demo audio engine
 import React, { useState, useRef, useEffect } from "react";
-import { FREE_TIER_LIMITS } from "@/lib/access-limits";
+import {
+  durationError,
+  exceedsDuration,
+  exceedsFileSize,
+  fileSizeError,
+  type AccessLevel,
+} from "@/lib/access-limits";
 import { uploadAudio, type MicType } from "@/lib/upload-client";
 
 /* ---------- Brand wordmark ---------- */
@@ -153,8 +159,28 @@ function MicDropdown({
 }
 
 const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
-const FREE_TIER_MAX_FILE_SIZE_BYTES = FREE_TIER_LIMITS.maxFileSizeMB * 1024 * 1024;
-const FILE_SIZE_ERROR = `File exceeds ${FREE_TIER_LIMITS.maxFileSizeMB}MB limit for free plan`;
+
+/**
+ * Reads duration from metadata only — the browser does not decode the file, so
+ * this stays cheap even at 500 MB. Resolves null when the duration cannot be
+ * determined (MP3s without a duration header report Infinity); the upload then
+ * proceeds rather than rejecting a file we were unable to measure.
+ */
+function readDurationSeconds(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const probe = new Audio();
+    const done = (value: number | null) => {
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () =>
+      done(Number.isFinite(probe.duration) ? probe.duration : null);
+    probe.onerror = () => done(null);
+    probe.src = url;
+  });
+}
 
 function UploadErrorMessage({ message }: { message: string }) {
   return (
@@ -167,49 +193,78 @@ function UploadErrorMessage({ message }: { message: string }) {
   );
 }
 
-export function UploadZone({ dark, compact }: any) {
+export function UploadZone({
+  dark,
+  compact,
+  access,
+}: {
+  dark?: boolean;
+  compact?: boolean;
+  access: AccessLevel;
+}) {
   const [file, setFile] = useState<any>(null);
   const [dragging, setDragging] = useState(false);
-  const [status, setStatus] = useState("idle"); // idle | ready | size-error | working | queued
+  // idle | checking | ready | limit-error | working | queued
+  const [status, setStatus] = useState("idle");
   const [error, setError] = useState<any>(null);
-  const [hasFileSizeError, setHasFileSizeError] = useState(false);
+  const [hasLimitError, setHasLimitError] = useState(false);
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
   const [micType, setMicType] = useState<MicType>("unknown");
   const [email, setEmail] = useState("");
   const inputRef = useRef<any>(null);
 
-  const accept = (f: any) => {
+  const rejectForLimit = (f: any, message: string) => {
+    setFile(f);
+    setHasLimitError(true);
+    setError(message);
+    setStatus("limit-error");
+  };
+
+  const accept = async (f: any) => {
     if (!f) return;
     if (!/\.(wav|mp3|m4a)$/i.test(f.name)) {
       setError("This doesn't look like an audio file we can read. We support WAV, MP3, and M4A.");
       return;
     }
-    if (f.size > FREE_TIER_MAX_FILE_SIZE_BYTES) {
-      setFile(f);
-      setHasFileSizeError(true);
-      setError(FILE_SIZE_ERROR);
-      setStatus("size-error");
+    if (exceedsFileSize(access, f.size)) {
+      rejectForLimit(f, fileSizeError(access, f.size));
       return;
     }
-    setHasFileSizeError(false);
+
+    setHasLimitError(false);
     setError(null);
     setFile(f);
+    setDurationSeconds(null);
+    setStatus("checking");
+
+    const seconds = await readDurationSeconds(f);
+    setDurationSeconds(seconds);
+
+    if (seconds !== null && exceedsDuration(access, seconds)) {
+      rejectForLimit(f, durationError(access, seconds));
+      return;
+    }
+
     setStatus("ready");
   };
 
   const onDrop = (e: any) => {
     e.preventDefault();
     setDragging(false);
-    accept(e.dataTransfer.files && e.dataTransfer.files[0]);
+    void accept(e.dataTransfer.files && e.dataTransfer.files[0]);
   };
 
   const startMastering = async (e: any) => {
     e.stopPropagation();
     if (!file) return;
 
-    if (file.size > FREE_TIER_MAX_FILE_SIZE_BYTES) {
-      setHasFileSizeError(true);
-      setError(FILE_SIZE_ERROR);
-      setStatus("size-error");
+    if (exceedsFileSize(access, file.size)) {
+      rejectForLimit(file, fileSizeError(access, file.size));
+      return;
+    }
+
+    if (durationSeconds !== null && exceedsDuration(access, durationSeconds)) {
+      rejectForLimit(file, durationError(access, durationSeconds));
       return;
     }
 
@@ -222,7 +277,7 @@ export function UploadZone({ dark, compact }: any) {
     setError(null);
 
     try {
-      await uploadAudio(file, micType, email.trim());
+      await uploadAudio(file, micType, email.trim(), access, durationSeconds);
       setStatus("queued");
     } catch (err) {
       setError(
@@ -237,7 +292,8 @@ export function UploadZone({ dark, compact }: any) {
     setFile(null);
     setStatus("idle");
     setError(null);
-    setHasFileSizeError(false);
+    setHasLimitError(false);
+    setDurationSeconds(null);
     setMicType("unknown");
     setEmail("");
   };
@@ -259,7 +315,7 @@ export function UploadZone({ dark, compact }: any) {
         type="file"
         accept=".wav,.mp3,.m4a,audio/wav,audio/mpeg,audio/mp4"
         style={{ display: "none" }}
-        onChange={(e) => accept(e.target.files && e.target.files[0])}
+        onChange={(e) => void accept(e.target.files && e.target.files[0])}
       />
 
       {status === "idle" && (
@@ -288,7 +344,11 @@ export function UploadZone({ dark, compact }: any) {
             <button className="btn btn-ghost btn-sm" onClick={reset} aria-label="Remove file" style={{ padding: "8px 12px" }}>✕</button>
           </div>
 
-          {(status === "ready" || status === "size-error") && (
+          {status === "checking" && (
+            <div className="microcopy" style={{ padding: "14px 0 4px" }}>Reading file…</div>
+          )}
+
+          {(status === "ready" || status === "limit-error") && (
             <>
               {error && <UploadErrorMessage message={error} />}
               <input
@@ -317,11 +377,11 @@ export function UploadZone({ dark, compact }: any) {
                 style={{
                   width: "100%",
                   justifyContent: "center",
-                  opacity: !file || hasFileSizeError ? 0.5 : 1,
-                  cursor: !file || hasFileSizeError ? "not-allowed" : "pointer",
+                  opacity: !file || hasLimitError ? 0.5 : 1,
+                  cursor: !file || hasLimitError ? "not-allowed" : "pointer",
                 }}
                 onClick={startMastering}
-                disabled={!file || hasFileSizeError}
+                disabled={!file || hasLimitError}
               >
                 Start mastering
               </button>

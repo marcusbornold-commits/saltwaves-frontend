@@ -1,52 +1,17 @@
 import "server-only";
 
 import { auth } from "@/auth";
-import { FREE_TIER_LIMITS } from "@/lib/access-limits";
+import {
+  FREE_ACCESS,
+  PLAN_LIMITS,
+  type AccessLevel,
+  type Plan,
+} from "@/lib/access-limits";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Profile } from "@/types/profile";
 import { redirect } from "next/navigation";
 
-export type Plan = "free" | "creator" | "studio" | "founding";
-
-export type AccessLevel = {
-  plan: Plan;
-  isPaid: boolean;
-  isFounding: boolean;
-  maxFileSizeMB: number;
-  maxDurationMinutes: number;
-};
-
-const FREE_ACCESS: AccessLevel = {
-  plan: "free",
-  isPaid: false,
-  isFounding: false,
-  maxFileSizeMB: FREE_TIER_LIMITS.maxFileSizeMB,
-  maxDurationMinutes: 60,
-};
-
-const CREATOR_ACCESS: AccessLevel = {
-  plan: "creator",
-  isPaid: true,
-  isFounding: false,
-  maxFileSizeMB: 500,
-  maxDurationMinutes: 180,
-};
-
-const FOUNDING_ACCESS: AccessLevel = {
-  plan: "founding",
-  isPaid: true,
-  isFounding: true,
-  maxFileSizeMB: 500,
-  maxDurationMinutes: 180,
-};
-
-const STUDIO_ACCESS: AccessLevel = {
-  plan: "studio",
-  isPaid: true,
-  isFounding: false,
-  maxFileSizeMB: -1,
-  maxDurationMinutes: -1,
-};
+export type { AccessLevel, Plan };
 
 function resolvePlan(profile: Profile): Plan {
   if (profile.lifetime_creator === true) {
@@ -62,19 +27,6 @@ function resolvePlan(profile: Profile): Plan {
   }
 
   return "free";
-}
-
-function planToAccess(plan: Plan): AccessLevel {
-  switch (plan) {
-    case "founding":
-      return FOUNDING_ACCESS;
-    case "studio":
-      return STUDIO_ACCESS;
-    case "creator":
-      return CREATOR_ACCESS;
-    default:
-      return FREE_ACCESS;
-  }
 }
 
 export async function getAccess(userId: string): Promise<AccessLevel> {
@@ -96,7 +48,30 @@ export async function getAccess(userId: string): Promise<AccessLevel> {
     return FREE_ACCESS;
   }
 
-  return planToAccess(resolvePlan(profile));
+  return PLAN_LIMITS[resolvePlan(profile)];
+}
+
+/**
+ * For public pages. Anonymous visitors get the free tier instead of a redirect.
+ *
+ * Advisory only: a failed profile read degrades to free rather than taking the
+ * page down, so the worst case is a paying customer briefly seeing free limits
+ * in the UI. The upload path re-resolves the level server-side and is the
+ * authority — it returns 503 rather than enforcing a level it could not read.
+ */
+export async function getAccessForSession(): Promise<AccessLevel> {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return FREE_ACCESS;
+  }
+
+  try {
+    return await getAccess(session.user.id);
+  } catch (error) {
+    console.error("Falling back to free limits, profile read failed:", error);
+    return FREE_ACCESS;
+  }
 }
 
 export async function requireAuth() {

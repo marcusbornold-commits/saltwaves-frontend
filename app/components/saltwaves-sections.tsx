@@ -466,7 +466,7 @@ function SocialIcon({ kind }: any) {
   );
 }
 
-export function Footer() {
+export function Footer({ omitFounding = false }: { omitFounding?: boolean } = {}) {
   return (
     <footer className="footer" data-screen-label="Footer">
       <div className="container">
@@ -495,7 +495,9 @@ export function Footer() {
               <h4>Company</h4>
               <ul>
                 <li><a href="/#about">About</a></li>
-                <li><a href="/founding">Founding</a></li>
+                {!omitFounding && (
+                  <li><a href="/founding">Founding</a></li>
+                )}
                 <li><a href="/services">Post-production</a></li>
                 <li><a href="/tjanster">Consulting</a></li>
                 <li><a href="mailto:hello@saltwaves.studio">Contact</a></li>

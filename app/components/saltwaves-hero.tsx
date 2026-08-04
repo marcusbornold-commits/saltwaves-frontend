@@ -1,6 +1,7 @@
 "use client";
 // saltwaves-hero.jsx — three hero variants (switch via Tweaks)
 import React from "react";
+import type { AccessLevel } from "@/lib/access-limits";
 import { UploadZone, WaveBars, VUMeter } from "./saltwaves-ui";
 
 const heroCommon = {
@@ -70,7 +71,7 @@ export function WaveCanvas({ motion, height = 170, dark }: any) {
 }
 
 /* ---------- Variant A: Split — copy left, upload right ---------- */
-export function HeroSplit({ headline, subline }: any) {
+export function HeroSplit({ headline, subline, access }: { headline: string; subline: string; access: AccessLevel }) {
   return (
     <section className="band" data-screen-label="Hero (Split)" style={{ paddingTop: "clamp(64px, 9vw, 110px)" }}>
       <div className="container" style={{ display: "grid", gridTemplateColumns: "minmax(0, 7fr) minmax(0, 5fr)", gap: "clamp(32px, 5vw, 72px)", alignItems: "center" }}>
@@ -82,7 +83,7 @@ export function HeroSplit({ headline, subline }: any) {
         </div>
         <div className="reveal in reveal-d1">
           <div id="try" className="scroll-mt-72">
-            <UploadZone />
+            <UploadZone access={access} />
           </div>
           <div style={{ marginTop: 22, opacity: 0.9 }}>
             <WaveBars n={64} seed={1.7} height={34} />
@@ -95,7 +96,7 @@ export function HeroSplit({ headline, subline }: any) {
 }
 
 /* ---------- Variant B: Wave — centered over a big animated waveform ---------- */
-export function HeroWave({ headline, subline, motion }: any) {
+export function HeroWave({ headline, subline, motion, access }: { headline: string; subline: string; motion?: boolean; access: AccessLevel }) {
   return (
     <section className="band" data-screen-label="Hero (Wave)" style={{ paddingTop: "clamp(56px, 8vw, 96px)", paddingBottom: "clamp(64px, 9vw, 110px)" }}>
       <div className="container" style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -112,7 +113,7 @@ export function HeroWave({ headline, subline, motion }: any) {
       </div>
       <div className="container" style={{ maxWidth: 640 }}>
         <div id="try" className="scroll-mt-72">
-          <UploadZone />
+          <UploadZone access={access} />
         </div>
       </div>
     </section>
@@ -120,7 +121,7 @@ export function HeroWave({ headline, subline, motion }: any) {
 }
 
 /* ---------- Variant C: Console — dark, VU-meter detail ---------- */
-export function HeroConsole({ headline, subline }: any) {
+export function HeroConsole({ headline, subline, access }: { headline: string; subline: string; access: AccessLevel }) {
   return (
     <section className="band band-dark hero-console" data-screen-label="Hero (Console)" style={{ paddingTop: "clamp(64px, 9vw, 110px)" }}>
       <div className="container">
@@ -138,7 +139,7 @@ export function HeroConsole({ headline, subline }: any) {
           </div>
           <div>
             <div id="try" className="scroll-mt-72">
-              <UploadZone dark={true} />
+              <UploadZone dark={true} access={access} />
             </div>
             <div style={{ marginTop: 22, opacity: 0.85 }}>
               <WaveBars n={64} seed={2.4} height={34} color="rgba(241,237,232,0.5)" />
