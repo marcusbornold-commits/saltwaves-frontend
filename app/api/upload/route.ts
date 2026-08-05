@@ -6,7 +6,7 @@ import {
   FREE_ACCESS,
   type AccessLevel,
 } from "@/lib/access-limits";
-import { getToken } from "next-auth/jwt";
+import { signUploadToken, tierForAccess } from "@/lib/upload-token";
 import { NextResponse } from "next/server";
 
 function getApiUrl(): string | null {
@@ -29,18 +29,6 @@ function parseMicType(value: FormDataEntryValue | null): MicType {
 
 export async function POST(request: Request) {
   const session = await auth();
-
-  let jwt: string | null = null;
-  if (session?.user?.id) {
-    const token = await getToken({
-      req: request,
-      raw: true,
-      secret: process.env.AUTH_SECRET,
-    });
-    if (typeof token === "string") {
-      jwt = token;
-    }
-  }
 
   let formData: FormData;
   try {
@@ -127,9 +115,20 @@ export async function POST(request: Request) {
   if (email) params.set("email", email);
   const upstreamUrl = `${apiUrl}/upload?${params.toString()}`;
 
+  // Same ticket the browser path sends — one token model, one verifier.
+  // Minting after the plan lookup reuses that read instead of hitting profiles
+  // a second time. A ticket we cannot mint means an anonymous upload, matching
+  // what lib/upload-client.ts does on a 401 or 503 from /api/upload-token.
   const headers: HeadersInit = {};
-  if (jwt) {
-    headers.Authorization = `Bearer ${jwt}`;
+  if (session?.user?.id) {
+    const token = await signUploadToken({
+      userId: session.user.id,
+      email: session.user.email ?? null,
+      tier: tierForAccess(access),
+    });
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
   }
 
   let upstreamRes: Response;

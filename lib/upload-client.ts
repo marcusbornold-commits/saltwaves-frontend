@@ -1,11 +1,31 @@
 import {
+  accessForTokenTier,
   durationError,
   exceedsDuration,
   exceedsFileSize,
   fileSizeError,
   FREE_ACCESS,
+  morePermissive,
   type AccessLevel,
 } from "@/lib/access-limits";
+import { decodeJwt } from "jose";
+
+/**
+ * Reads the tier out of the upload token without verifying it. Safe: the tier
+ * only picks which limits the browser pre-checks against and which plan the
+ * error copy names. /api/upload-token signed it and the backend verifies it —
+ * nothing here is an authorisation decision.
+ */
+function accessFromToken(token: string): AccessLevel | null {
+  try {
+    const tier = decodeJwt(token).tier;
+    return tier === "lifetime_creator" || tier === "free"
+      ? accessForTokenTier(tier)
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 export type MicType = "dynamic" | "condenser" | "headset" | "unknown";
 
@@ -39,13 +59,41 @@ export async function uploadAudio(
     );
   }
 
-  if (exceedsFileSize(access, file.size)) {
-    throw new UploadError(fileSizeError(access, file.size), "file_too_large");
+  // Ahead of the limit checks, so a signed-in caller is measured against their
+  // own tier. A 401 (or any other failure) means anonymous — same upload as
+  // before, same free limits.
+  let token: string | null = null;
+  try {
+    const tokenRes = await fetch("/api/upload-token");
+    if (tokenRes.ok) {
+      const tokenData = (await tokenRes.json()) as { token?: string | null };
+      token = tokenData.token ?? null;
+    }
+  } catch {
+    token = null;
   }
 
-  if (durationSeconds !== null && exceedsDuration(access, durationSeconds)) {
+  // The token's tier is coarse (founding or not), so it raises the ceiling the
+  // page was rendered with, never lowers it — a Studio subscriber must not be
+  // cut down to free limits just because they aren't a founding member.
+  const tokenAccess = token ? accessFromToken(token) : null;
+  const effectiveAccess = tokenAccess
+    ? morePermissive(access, tokenAccess)
+    : access;
+
+  if (exceedsFileSize(effectiveAccess, file.size)) {
     throw new UploadError(
-      durationError(access, durationSeconds),
+      fileSizeError(effectiveAccess, file.size),
+      "file_too_large",
+    );
+  }
+
+  if (
+    durationSeconds !== null &&
+    exceedsDuration(effectiveAccess, durationSeconds)
+  ) {
+    throw new UploadError(
+      durationError(effectiveAccess, durationSeconds),
       "episode_too_long",
     );
   }
@@ -56,17 +104,6 @@ export async function uploadAudio(
       "Upload is temporarily unavailable — try again in a few minutes.",
       "service_unavailable",
     );
-  }
-
-  let token: string | null = null;
-  try {
-    const tokenRes = await fetch("/api/upload-token");
-    if (tokenRes.ok) {
-      const tokenData = (await tokenRes.json()) as { token: string | null };
-      token = tokenData.token ?? null;
-    }
-  } catch {
-    token = null;
   }
 
   const params = new URLSearchParams({ mode: "standard", mic_type: micType });

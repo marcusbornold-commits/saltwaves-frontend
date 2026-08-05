@@ -52,6 +52,32 @@ export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
 
 export const FREE_ACCESS = PLAN_LIMITS.free;
 
+/**
+ * The upload token only distinguishes founding members from everyone else —
+ * that is all the backend needs to know. Coarser than {@link Plan}, so it can
+ * only ever be read alongside the session-resolved level, never instead of it.
+ */
+export function accessForTokenTier(
+  tier: "lifetime_creator" | "free",
+): AccessLevel {
+  return tier === "lifetime_creator" ? PLAN_LIMITS.founding : FREE_ACCESS;
+}
+
+/**
+ * Picks the more generous of two levels, whole — never a blend, because the
+ * error copy names the level's own plan and a synthetic mix would name the
+ * wrong one. Two sources feed the client-side check: the level rendered into
+ * the page and the tier in the upload token. Erring generous keeps the browser
+ * from rejecting a file the server would have accepted; the server re-resolves
+ * the plan and stays the authority on what actually runs.
+ */
+export function morePermissive(a: AccessLevel, b: AccessLevel): AccessLevel {
+  if (b.maxDurationMinutes !== a.maxDurationMinutes) {
+    return b.maxDurationMinutes > a.maxDurationMinutes ? b : a;
+  }
+  return b.maxFileSizeMB > a.maxFileSizeMB ? b : a;
+}
+
 export function maxFileSizeBytes(level: AccessLevel): number {
   return level.maxFileSizeMB * 1024 * 1024;
 }
