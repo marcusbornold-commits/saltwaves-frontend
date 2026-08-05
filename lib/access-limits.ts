@@ -20,7 +20,7 @@ export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
     label: "Free",
     isPaid: false,
     isFounding: false,
-    maxFileSizeMB: 500,
+    maxFileSizeMB: 1000,
     maxDurationMinutes: 60,
   },
   creator: {
@@ -28,7 +28,7 @@ export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
     label: "Creator",
     isPaid: true,
     isFounding: false,
-    maxFileSizeMB: 500,
+    maxFileSizeMB: 1000,
     maxDurationMinutes: 180,
   },
   // Founding is the Creator tier for life — identical ceilings, deliberately.
@@ -37,7 +37,7 @@ export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
     label: "Founding",
     isPaid: true,
     isFounding: true,
-    maxFileSizeMB: 500,
+    maxFileSizeMB: 1000,
     maxDurationMinutes: 180,
   },
   studio: {
