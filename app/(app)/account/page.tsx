@@ -116,7 +116,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   return (
     <>
-      <Nav />
+      <Nav isLoggedIn />
       <main className="login-wrap account-wrap">
         <div className="login-card">
           {checkout === "success" && (

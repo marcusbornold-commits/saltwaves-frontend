@@ -14,8 +14,10 @@ const navItems = [
   { href: "/founding", label: "Founding", highlight: true },
 ];
 
-export function Nav({ dark }: any) {
+export function Nav({ dark, isLoggedIn = false }: { dark?: boolean; isLoggedIn?: boolean }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const accountHref = isLoggedIn ? "/account" : "/login";
+  const accountLabel = isLoggedIn ? "Account" : "Log in";
 
   return (
     <header className={"nav" + (dark ? " nav-dark" : "")} data-screen-label="Navbar">
@@ -33,7 +35,7 @@ export function Nav({ dark }: any) {
           </ul>
         </nav>
         <div className="nav-actions">
-          <a className="btn btn-primary btn-sm" href="/login">Log in</a>
+          <a className="btn btn-primary btn-sm" href={accountHref}>{accountLabel}</a>
           <button
             type="button"
             className="nav-menu-toggle"
@@ -78,7 +80,7 @@ export function Nav({ dark }: any) {
             </li>
           ))}
           <li>
-            <a className="text-ink hover:text-orange" href="/login" onClick={() => setMenuOpen(false)}>Log in</a>
+            <a className="text-ink hover:text-orange" href={accountHref} onClick={() => setMenuOpen(false)}>{accountLabel}</a>
           </li>
         </ul>
       </nav>
