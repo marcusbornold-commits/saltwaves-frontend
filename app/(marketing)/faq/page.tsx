@@ -9,7 +9,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What file types do you support?",
-    a: "WAV, MP3, and M4A. Free tier: up to 200 MB and 60 minutes per episode. Creator and Founding plans: up to 500 MB and 180 minutes. Studio has no file-size or duration cap.",
+    a: "WAV, MP3, and M4A. Free tier: up to 200 MB and 60 minutes per episode, 2 hours of processing per month. Creator and Founding: up to 1 GB and 180 minutes per episode, 10 hours per month. Studio: up to 1 GB and 300 minutes per episode, 30 hours per month.",
   },
   {
     q: "Which mic type should I pick?",

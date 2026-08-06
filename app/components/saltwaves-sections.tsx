@@ -360,17 +360,17 @@ export function Pricing({
   const tiers: any[] = [
     {
       name: "Free", m: p.free, y: p.free, per: "forever", badge: "No credit card required",
-      items: ["Full quality, no watermark", "3 episodes a month", "Email delivery", "No account needed"],
+      items: ["Full quality, no watermark", "2 hours of processing a month", "Email delivery", "No account needed"],
       cta: "Start free",
     },
     {
       name: "Creator", id: "creator" as const, m: p.creator[0], y: p.creator[1], featured: true, badge: "Most popular",
-      items: ["Unlimited episodes", "Priority processing"],
+      items: ["10 hours of processing per month", "Priority processing"],
       cta: "Get Creator",
     },
     {
       name: "Studio", id: "studio" as const, m: p.studio[0], y: p.studio[1],
-      items: ["Everything in Creator", { label: "Batch processing", soon: true }],
+      items: ["30 hours of processing per month", "Everything in Creator", { label: "Batch processing", soon: true }],
       cta: "Get Studio",
     },
   ];
