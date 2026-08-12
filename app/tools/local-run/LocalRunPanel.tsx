@@ -35,6 +35,18 @@ function formatStarted(iso: string): string {
   }
 }
 
+/** Upward process timer: mm:ss, or h:mm:ss once past an hour. */
+function formatElapsed(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = m.toString().padStart(2, "0");
+  const ss = sec.toString().padStart(2, "0");
+  if (h > 0) return `${h}:${mm}:${ss}`;
+  return `${mm}:${ss}`;
+}
+
 type Mode = "mild" | "standard" | "strong";
 type MicType = "dynamic" | "condenser" | "headset" | "unknown";
 
@@ -368,6 +380,7 @@ export default function LocalRunPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const healthPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const jobStartRef = useRef<number | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [specs, setSpecs] = useState<SpecsMap>({});
@@ -380,6 +393,8 @@ export default function LocalRunPanel() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [serverError, setServerError] = useState("");
   const [specsError, setSpecsError] = useState("");
+  /** Elapsed seconds for the current/last job; null until a job starts. */
+  const [elapsedSec, setElapsedSec] = useState<number | null>(null);
 
   const [runnerStatus, setRunnerStatus] = useState<RunnerStatus>("checking");
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -461,6 +476,24 @@ export default function LocalRunPanel() {
     };
   }, []);
 
+  const busy = phase === "uploading" || phase === "running" || phase === "analyzing";
+
+  // Upward process timer: ticks while uploading/running/analyzing, freezes on done/error.
+  useEffect(() => {
+    if (!busy) {
+      if (jobStartRef.current != null && (phase === "done" || phase === "error")) {
+        setElapsedSec(Math.floor((Date.now() - jobStartRef.current) / 1000));
+      }
+      return;
+    }
+    const id = setInterval(() => {
+      if (jobStartRef.current != null) {
+        setElapsedSec(Math.floor((Date.now() - jobStartRef.current) / 1000));
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, [busy, phase]);
+
   const resetResults = () => {
     setBeforeResult(null);
     setAfterResult(null);
@@ -474,6 +507,8 @@ export default function LocalRunPanel() {
 
   const onFile = (f: File) => {
     resetResults();
+    jobStartRef.current = null;
+    setElapsedSec(null);
     setFile(f);
     setPhase("idle");
     setStatusText("");
@@ -562,6 +597,8 @@ export default function LocalRunPanel() {
   const runChain = async () => {
     if (!file || !specKey) return;
     resetResults();
+    jobStartRef.current = Date.now();
+    setElapsedSec(0);
     setPhase("uploading");
     setStatusText("Laddar upp…");
 
@@ -602,7 +639,6 @@ export default function LocalRunPanel() {
     }
   };
 
-  const busy = phase === "uploading" || phase === "running" || phase === "analyzing";
   const selectedSpec = specKey ? specs[specKey] : null;
   const runnerDown = runnerForceDown || runnerStatus === "down";
   const versionStale =
@@ -807,10 +843,18 @@ export default function LocalRunPanel() {
         </button>
       </div>
 
-      {(statusText || jobLog) && phase !== "done" && (
+      {(statusText || jobLog || elapsedSec != null) && (
         <div className="lr-status" role="status" aria-live="polite">
-          {statusText && <p className="lr-status-line">{statusText}</p>}
-          {jobLog && (
+          {elapsedSec != null && (
+            <p className="lr-elapsed" aria-label={`Förfluten tid ${formatElapsed(elapsedSec)}`}>
+              <span className="lr-elapsed-label">Tid</span>{" "}
+              <span className="lr-elapsed-value">{formatElapsed(elapsedSec)}</span>
+            </p>
+          )}
+          {statusText && phase !== "done" && (
+            <p className="lr-status-line">{statusText}</p>
+          )}
+          {jobLog && phase !== "done" && (
             <pre className="lr-log">{jobLog}</pre>
           )}
         </div>
@@ -959,6 +1003,15 @@ const LOCAL_RUN_CSS = `
 }
 .lr-download-secondary:hover:not(:disabled){border-color:var(--ink)}
 .lr-status-line{margin:0 0 8px;font-size:14px;color:var(--ink-60)}
+.lr-elapsed{
+  margin:0 0 8px;font-size:14px;font-variant-numeric:tabular-nums;
+  display:flex;align-items:baseline;gap:8px;
+}
+.lr-elapsed-label{
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-60);
+}
+.lr-elapsed-value{font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .lr-log{
   margin:0;padding:12px 14px;border-radius:10px;border:1px solid var(--line);
   background:rgba(255,255,255,.45);font-size:12px;line-height:1.5;
