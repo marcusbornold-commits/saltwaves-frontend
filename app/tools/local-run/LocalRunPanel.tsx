@@ -74,7 +74,7 @@ const CEILING_EPS = 0.05;
 const DEFAULT_LUFS_TOL = 0.5;
 
 const METHODOLOGY =
-  "Methodology: ITU-R BS.1770-4 (K-weighted, gated) · true peak 4× oversampled · LTAS Hann 4096 / 50 % overlap, RMS-gated median −15 dB, level-normalised to the 250 Hz – 4 kHz speech core. Read 9k+ with care on lossy sources.";
+  "Methodology: ITU-R BS.1770-4 (K-weighted, gated) · true peak 4× oversampled · LTAS Hann 4096 / 50 % overlap, RMS-gated median −15 dB. Spectral / LTAS figures are relative to the 250 Hz – 4 kHz speech core (reference shift / normalisation, not a boost). Read 9k+ with care on lossy sources.";
 
 const MODES: { value: Mode; label: string }[] = [
   { value: "mild", label: "mild (80 Hz)" },
