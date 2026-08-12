@@ -480,19 +480,18 @@ export default function LocalRunPanel() {
 
   // Upward process timer: ticks while uploading/running/analyzing, freezes on done/error.
   useEffect(() => {
-    if (!busy) {
-      if (jobStartRef.current != null && (phase === "done" || phase === "error")) {
-        setElapsedSec(Math.floor((Date.now() - jobStartRef.current) / 1000));
-      }
-      return;
-    }
-    const id = setInterval(() => {
+    if (!busy) return;
+    const tick = () => {
       if (jobStartRef.current != null) {
         setElapsedSec(Math.floor((Date.now() - jobStartRef.current) / 1000));
       }
-    }, 250);
-    return () => clearInterval(id);
-  }, [busy, phase]);
+    };
+    const id = setInterval(tick, 250);
+    return () => {
+      clearInterval(id);
+      tick();
+    };
+  }, [busy]);
 
   const resetResults = () => {
     setBeforeResult(null);
