@@ -31,7 +31,7 @@ export const DIAG_BANDS: { name: string; lo: number; hi: number }[] = [
   { name: "80–160 · warmth", lo: 80, hi: 160 },
   { name: "160–500 · body", lo: 160, hi: 500 },
   { name: "500–6k · anchor", lo: 500, hi: 6000 },
-  { name: "6–9k · sibilance", lo: 6000, hi: 9000 },
+  { name: "6–9k · vs speech core", lo: 6000, hi: 9000 },
   { name: "9k+ · air", lo: 9000, hi: Infinity },
 ];
 
