@@ -100,6 +100,10 @@ export function AbAnalysisResults({
       {both && a.ltas && b.ltas && (
         <section className="aba-bands" aria-label="Diagnosis bands">
           <h2 className="aba-h2">Diagnosis bands — mean Δ (B − A)</h2>
+          <p className="aba-bands-note">
+            Band deltas are relative to the 250 Hz – 4 kHz speech core
+            (reference shift, not a boost or raise).
+          </p>
           <div className="aba-band-grid">
             {DIAG_BANDS.map((band) => {
               const d = meanDelta(a.ltas!, b.ltas!, band.lo, band.hi);
@@ -118,8 +122,8 @@ export function AbAnalysisResults({
           <p className="aba-foot">
             Methodology: ITU-R BS.1770-4 (K-weighted, gated) · true peak 4×
             oversampled · LTAS Hann 4096 / 50 % overlap, RMS-gated median −15
-            dB, level-normalised to the 250 Hz – 4 kHz speech core. Read 9k+
-            with care on lossy sources.
+            dB, level-normalised to the 250 Hz – 4 kHz speech core (reference
+            shift, not a boost). Read 9k+ with care on lossy sources.
           </p>
         </section>
       )}
@@ -156,7 +160,7 @@ function LtasChart({ a, b }: { a: LtasResult | null; b: LtasResult | null }) {
     { label: "warmth", lo: 80, hi: 160 },
     { label: "body", lo: 160, hi: 500 },
     { label: "anchor", lo: 500, hi: 6000 },
-    { label: "sibilance", lo: 6000, hi: 9000 },
+    { label: "6–9k rel.", lo: 6000, hi: 9000 },
     { label: "air", lo: 9000, hi: fHi },
   ];
 
@@ -365,6 +369,9 @@ export const ABA_CSS = `
   font-family:'Archivo',sans-serif;
 }
 .aba-bands{max-width:920px;margin:0 auto}
+.aba-bands-note{
+  margin:-6px 0 14px;font-size:12.5px;color:var(--ink-60);line-height:1.5;max-width:720px;
+}
 .aba-band-grid{
   display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
 }
