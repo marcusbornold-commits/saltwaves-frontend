@@ -44,6 +44,47 @@ export class UploadError extends Error {
   }
 }
 
+/** Cookie set by saltwaves.studio Loudness Inspector (domain=.saltwaves.studio). */
+const LI_FIRST_TOUCH_COOKIE = "sw_li_first_touch";
+
+/**
+ * Read first-touch ms from `sw_li_first_touch`. Duplicated locally on purpose —
+ * do not import from saltwaves-site. Value is Date.now() digits, or null.
+ */
+function readLiFirstTouchMs(): number | null {
+  if (typeof document === "undefined") return null;
+  const hit = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${LI_FIRST_TOUCH_COOKIE}=`));
+  if (!hit) return null;
+  const value = hit.slice(LI_FIRST_TOUCH_COOKIE.length + 1);
+  if (!/^\d+$/.test(value)) return null;
+  const ms = Number(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Attribution for FastAPI → upload_events. Query params when cookie present:
+ * - first_touch_ms: epoch ms from the cookie
+ * - first_touch_at: ISO-8601 of that instant
+ * - days_since_first_touch: whole days since first_touch_ms
+ */
+function loudnessInspectorAttribution(): {
+  first_touch_ms: number;
+  first_touch_at: string;
+  days_since_first_touch: number;
+} | null {
+  const firstTouchMs = readLiFirstTouchMs();
+  if (firstTouchMs === null) return null;
+  return {
+    first_touch_ms: firstTouchMs,
+    first_touch_at: new Date(firstTouchMs).toISOString(),
+    days_since_first_touch: Math.floor(
+      (Date.now() - firstTouchMs) / 86_400_000,
+    ),
+  };
+}
+
 export async function uploadAudio(
   file: File,
   micType: MicType = "unknown",
@@ -109,6 +150,17 @@ export async function uploadAudio(
 
   const params = new URLSearchParams({ mode: "standard", mic_type: micType });
   if (email) params.set("email", email);
+
+  // Loudness Inspector → PodMaster conversion attribution (cookie optional).
+  const attribution = loudnessInspectorAttribution();
+  if (attribution) {
+    params.set("first_touch_ms", String(attribution.first_touch_ms));
+    params.set("first_touch_at", attribution.first_touch_at);
+    params.set(
+      "days_since_first_touch",
+      String(attribution.days_since_first_touch),
+    );
+  }
 
   const form = new FormData();
   form.append("file", file, file.name);
