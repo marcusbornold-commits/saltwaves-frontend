@@ -92,6 +92,7 @@ export async function uploadAudio(
   // Same table the API route enforces against — see lib/access-limits.ts.
   access: AccessLevel = FREE_ACCESS,
   durationSeconds: number | null = null,
+  onProgress?: (loaded: number, total: number) => void,
 ): Promise<UploadResult> {
   if (!/\.(wav|mp3|m4a)$/i.test(file.name)) {
     throw new UploadError(
@@ -164,35 +165,55 @@ export async function uploadAudio(
   const form = new FormData();
   form.append("file", file, file.name);
 
-  const headers: HeadersInit = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
+  return new Promise<UploadResult>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${apiBase}/upload?${params.toString()}`);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
-  let response: Response;
-  try {
-    response = await fetch(`${apiBase}/upload?${params.toString()}`, {
-      method: "POST",
-      headers,
-      body: form,
-    });
-  } catch {
-    throw new UploadError(
-      "Upload is temporarily unavailable — try again in a few minutes.",
-      "service_unavailable",
-    );
-  }
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || !onProgress) return;
+      onProgress(event.loaded, event.total);
+    };
 
-  const data = (await response.json().catch(() => ({}))) as UploadResult & {
-    error?: string;
-    message?: string;
-    error_code?: string;
-  };
+    xhr.onload = () => {
+      let data: UploadResult & {
+        error?: string;
+        message?: string;
+        error_code?: string;
+      } = {};
+      try {
+        data = JSON.parse(xhr.responseText) as typeof data;
+      } catch {
+        /* empty body or non-JSON */
+      }
 
-  if (!response.ok) {
-    throw new UploadError(
-      data.message ?? data.error ?? "Upload failed — try again.",
-      data.error_code,
-    );
-  }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(
+          new UploadError(
+            data.message ?? data.error ?? "Upload failed — try again.",
+            data.error_code,
+          ),
+        );
+        return;
+      }
+      resolve(data);
+    };
 
-  return data;
+    xhr.onerror = (event) => {
+      console.error("Upload network error", {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        readyState: xhr.readyState,
+        event,
+      });
+      reject(
+        new UploadError(
+          "Upload is temporarily unavailable — try again in a few minutes.",
+          "service_unavailable",
+        ),
+      );
+    };
+
+    xhr.send(form);
+  });
 }

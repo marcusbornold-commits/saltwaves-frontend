@@ -15,6 +15,32 @@ export type AbPageConfig = {
 };
 
 export const AB_PAGES: Record<string, AbPageConfig> = {
+  "faltinspelning-0abd": {
+    slug: "faltinspelning-0abd",
+    title: "Fältinspelning",
+    eyebrow: "Saltwaves · private A/B review",
+    subtitle:
+      "A raw field recording, straight off the recorder, against the same 60 seconds through the Saltwaves mastering chain at EBU R128 broadcast spec. Both tracks land within 0.1 LU of each other, so nothing you hear is a loudness difference. It is noise, room and clipping.",
+    trackA: {
+      src: "/ab/faltinspelning-0abd/falt-a-before.mp3",
+      label: "A · Raw field recording",
+      hint: "Straight off the recorder",
+    },
+    trackB: {
+      src: "/ab/faltinspelning-0abd/falt-b-after.mp3",
+      label: "B · After Saltwaves chain",
+      hint: "Broadcast −23 LUFS",
+    },
+    findings: [
+      "Raw field recording, this excerpt: −24.0 LUFS · +1.9 dBTP · LRA 4.3 LU · noise floor −50.3 dB",
+      "After Saltwaves chain: −24.0 LUFS · −4.9 dBTP · LRA 5.1 LU · noise floor −78.3 dB",
+      "The two tracks sit 0.01 LU apart. No level matching was applied — the raw take happened to land on the broadcast target already, so the comparison is processing only",
+      "The raw take clips: 447 samples pinned at full scale in the source recording, and this excerpt still reconstructs to +1.9 dBTP, above digital zero. After the chain, true peak is −4.9 dBTP",
+      "Noise floor drops 27.9 dB. Broadcast spec asks for −55 dB; the raw take missed it at −50.3 dB and lands at −78.3 dB after",
+      "Chain: DeepFilterNet3 on a Saltwaves-trained checkpoint, 90 Hz low-cut, condenser presence curve — 12.0 dB cut at 586 Hz (boxiness), 5.5 dB at 2.5 kHz (presence peak)",
+      "60-second excerpt from 00:30, identical window in both tracks",
+    ],
+  },
   "npf-podden-x7k4": {
     slug: "npf-podden-x7k4",
     title: "NPF-podden",

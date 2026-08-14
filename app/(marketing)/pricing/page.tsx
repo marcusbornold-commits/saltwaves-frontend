@@ -7,7 +7,7 @@ import "./pricing.css";
 export const metadata: Metadata = {
   title: "Pricing — PodMaster by Saltwaves",
   description:
-    "Start free with 3 episodes a month. Upgrade to Creator or Studio for unlimited processing and priority delivery.",
+    "Start free with 2 hours of processing a month. Upgrade to Creator for 10 hours, or Studio for 30 hours with priority delivery.",
 };
 
 type PricingPageProps = {

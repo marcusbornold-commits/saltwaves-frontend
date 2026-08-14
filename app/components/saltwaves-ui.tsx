@@ -212,6 +212,7 @@ export function UploadZone({
   const [micType, setMicType] = useState<MicType>("unknown");
   const [email, setEmail] = useState("");
   const inputRef = useRef<any>(null);
+  const [uploadBytes, setUploadBytes] = useState<{ loaded: number; total: number } | null>(null);
 
   const rejectForLimit = (f: any, message: string) => {
     setFile(f);
@@ -275,15 +276,24 @@ export function UploadZone({
 
     setStatus("working");
     setError(null);
+    setUploadBytes({ loaded: 0, total: file.size });
 
     try {
-      await uploadAudio(file, micType, email.trim(), access, durationSeconds);
+      await uploadAudio(
+        file,
+        micType,
+        email.trim(),
+        access,
+        durationSeconds,
+        (loaded, total) => setUploadBytes({ loaded, total }),
+      );
       setStatus("queued");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Upload failed — try again.",
       );
       setStatus("ready");
+      setUploadBytes(null);
     }
   };
 
@@ -296,6 +306,7 @@ export function UploadZone({
     setDurationSeconds(null);
     setMicType("unknown");
     setEmail("");
+    setUploadBytes(null);
   };
 
   return (
@@ -390,13 +401,52 @@ export function UploadZone({
               </div>
             </>
           )}
-          {status === "working" && (
-            <div className="microcopy" style={{ padding: "14px 0 4px" }}>Listening… measuring noise floor &amp; loudness</div>
-          )}
+          {status === "working" && (() => {
+            const total = uploadBytes?.total || file.size;
+            const loaded = Math.min(uploadBytes?.loaded ?? 0, total);
+            const done = total > 0 && loaded >= total;
+            if (done) {
+              return (
+                <div className="microcopy" style={{ padding: "14px 0 4px" }}>
+                  Listening… measuring noise floor &amp; loudness
+                </div>
+              );
+            }
+            const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            const loadedMb = (loaded / 1048576).toFixed(1);
+            const totalMb = (total / 1048576).toFixed(1);
+            return (
+              <div style={{ padding: "14px 0 4px", textAlign: "left" }}>
+                <div className="microcopy" style={{ marginBottom: 8 }}>
+                  Uploading… {pct}% · {loadedMb} of {totalMb} MB
+                </div>
+                <div
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  style={{
+                    height: 6,
+                    borderRadius: 3,
+                    background: "rgba(26, 26, 26, 0.12)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${pct}%`,
+                      height: "100%",
+                      background: "var(--orange)",
+                      transition: "width 0.15s ease",
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
           {status === "queued" && (
             <div style={{ fontWeight: 700, color: "var(--orange)", padding: "12px 0 2px", fontSize: 15 }}>
-              ✓ Queued for mastering
-              <div className="microcopy" style={{ fontWeight: 400, marginTop: 4 }}>We&apos;ll email you when it&apos;s ready.</div>
+              Queued for mastering. We&apos;ll email you when it&apos;s ready — you can close this window.
             </div>
           )}
         </div>

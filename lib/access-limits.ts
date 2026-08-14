@@ -1,7 +1,9 @@
 // Client-safe on purpose. The numbers live here rather than in lib/access.ts,
 // so the browser, the upload proxy and the error copy all read one table
-// instead of drifting copies. lib/access.ts owns the database lookup that
-// decides *which* row applies; this file decides what that row grants.
+// instead of drifting copies. File size, per-file duration, and the monthly
+// minute quota all live in this table; the server is the one that enforces
+// the monthly quota. lib/access.ts owns the database lookup that decides
+// *which* row applies; this file decides what that row grants.
 
 export type Plan = "free" | "creator" | "founding" | "studio";
 
@@ -12,6 +14,7 @@ export type AccessLevel = {
   isFounding: boolean;
   maxFileSizeMB: number;
   maxDurationMinutes: number;
+  maxMinutesPerMonth: number;
 };
 
 export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
@@ -20,8 +23,9 @@ export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
     label: "Free",
     isPaid: false,
     isFounding: false,
-    maxFileSizeMB: 1000,
+    maxFileSizeMB: 200,
     maxDurationMinutes: 60,
+    maxMinutesPerMonth: 120,
   },
   creator: {
     plan: "creator",
@@ -30,6 +34,7 @@ export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
     isFounding: false,
     maxFileSizeMB: 1000,
     maxDurationMinutes: 180,
+    maxMinutesPerMonth: 600,
   },
   // Founding is the Creator tier for life — identical ceilings, deliberately.
   founding: {
@@ -39,14 +44,16 @@ export const PLAN_LIMITS: Record<Plan, AccessLevel> = {
     isFounding: true,
     maxFileSizeMB: 1000,
     maxDurationMinutes: 180,
+    maxMinutesPerMonth: 600,
   },
   studio: {
     plan: "studio",
     label: "Studio",
     isPaid: true,
     isFounding: false,
-    maxFileSizeMB: 1024,
+    maxFileSizeMB: 1000,
     maxDurationMinutes: 300,
+    maxMinutesPerMonth: 1800,
   },
 };
 

@@ -18,7 +18,7 @@ export default function TermsOfServicePage() {
 
       <h2>Free tier</h2>
       <p>
-        Three episodes per month, no account required, no guaranteed
+        Two hours of processing per month, no account required, no guaranteed
         availability or turnaround.
       </p>
 
