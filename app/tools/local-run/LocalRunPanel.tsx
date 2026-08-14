@@ -128,6 +128,11 @@ const MICS: { value: MicType; label: string }[] = [
   { value: "unknown", label: "Okänd / auto" },
 ];
 
+const REPORT_LOCALES: { value: ReportLocale; label: string }[] = [
+  { value: "sv", label: "Svenska" },
+  { value: "en", label: "English" },
+];
+
 function lufsTolerance(spec: SpecEntry): number {
   return spec.lufsTol ?? DEFAULT_LUFS_TOL;
 }
@@ -140,13 +145,6 @@ function passesCeiling(measured: number, limit: number): boolean {
 /** Symmetric LUFS window around target (not a strict inequality). */
 function passesLufs(measured: number, target: number, tol: number): boolean {
   return isFinite(measured) && Math.abs(measured - target) <= tol;
-}
-
-function reportLocaleForSpec(spec: SpecEntry, specKey = ""): ReportLocale {
-  const hay = `${spec.label} ${specKey}`.toLowerCase();
-  return /audiobook\s*nordic|audiobook_nordic|nordic\s*audiobook/.test(hay)
-    ? "sv"
-    : "en";
 }
 
 function formatDecimal(
@@ -500,6 +498,7 @@ export default function LocalRunPanel() {
   const [file, setFile] = useState<File | null>(null);
   const [specs, setSpecs] = useState<SpecsMap>({});
   const [specKey, setSpecKey] = useState("");
+  const [reportLocale, setReportLocale] = useState<ReportLocale>("sv");
   const [mode, setMode] = useState<Mode>("standard");
   const [mic, setMic] = useState<MicType>("unknown");
   const [phase, setPhase] = useState<JobPhase>("idle");
@@ -916,6 +915,21 @@ export default function LocalRunPanel() {
         </label>
 
         <label className="lr-field">
+          <span className="lr-label">Rapportspråk</span>
+          <select
+            className="lr-select"
+            value={reportLocale}
+            onChange={(e) => setReportLocale(e.target.value as ReportLocale)}
+          >
+            {REPORT_LOCALES.map((lang) => (
+              <option key={lang.value} value={lang.value}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="lr-field">
           <span className="lr-label">Lågsnitt</span>
           <select
             className="lr-select"
@@ -1032,23 +1046,25 @@ export default function LocalRunPanel() {
               ) {
                 return;
               }
-              const locale = reportLocaleForSpec(selectedSpec, specKey);
               const rows = evaluateSpecRows(
                 selectedSpec,
                 beforeResult,
                 afterResult,
                 beforeNoiseFloorDb,
                 noiseFloorDb,
-                locale,
+                reportLocale,
               );
               const html = buildDeliveryReportHtml({
                 filename: file.name,
-                dateLabel: reportDateLabel(locale),
+                dateLabel: reportDateLabel(reportLocale),
                 specLabel: selectedSpec.label,
                 rows,
-                locale,
+                locale: reportLocale,
               });
-              downloadBlob(deliveryReportBasename(file.name, locale), html);
+              downloadBlob(
+                deliveryReportBasename(file.name, reportLocale),
+                html,
+              );
             }}
           >
             Ladda ner rapport
