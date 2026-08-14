@@ -6,7 +6,6 @@ import {
   ABA_CSS,
   AbAnalysisResults,
   decodeAnalysisError,
-  fmt,
 } from "../ab-analyzer/ab-analysis-ui";
 
 const API = "http://127.0.0.1:8766";
@@ -73,8 +72,48 @@ type JobPhase =
 const CEILING_EPS = 0.05;
 const DEFAULT_LUFS_TOL = 0.5;
 
-const METHODOLOGY =
-  "Methodology: ITU-R BS.1770-4 (K-weighted, gated) · true peak 4× oversampled · LTAS Hann 4096 / 50 % overlap, RMS-gated median −15 dB. Spectral / LTAS figures are relative to the 250 Hz – 4 kHz speech core (reference shift / normalisation, not a boost). Read 9k+ with care on lossy sources.";
+type ReportLocale = "en" | "sv";
+
+const REPORT_COPY = {
+  en: {
+    title: "Delivery report",
+    file: "File",
+    date: "Date",
+    spec: "Target spec",
+    parameter: "Parameter",
+    before: "Before",
+    after: "After",
+    requirement: "Requirement",
+    result: "Result",
+    noiseFloor: "Noise floor",
+    snr: "Signal/noise",
+    methodology:
+      "Methodology: ITU-R BS.1770-4 (K-weighted, gated) · true peak 4× oversampled · LTAS Hann 4096 / 50 % overlap, RMS-gated median −15 dB. Spectral / LTAS figures are relative to the 250 Hz – 4 kHz speech core (reference shift / normalisation, not a boost). Read 9k+ with care on lossy sources.",
+    note: "The noise floor is measured as an absolute level and rises when the file is lifted. Signal/noise is the figure that describes the processing.",
+    processed: "Processed on own hardware inside the EU",
+    location: "Örebro, Sweden",
+    reportSuffix: "delivery-report",
+  },
+  sv: {
+    title: "Leveransrapport",
+    file: "Fil",
+    date: "Datum",
+    spec: "Målspec",
+    parameter: "Parameter",
+    before: "Före",
+    after: "Efter",
+    requirement: "Krav",
+    result: "Utfall",
+    noiseFloor: "Brusgolv",
+    snr: "Signal/brus",
+    methodology:
+      "Metodik: ITU-R BS.1770-4 (K-viktad, gated) · true peak 4× översamplad · LTAS Hann 4096 / 50 % överlapp, RMS-gated median −15 dB. Spektrala / LTAS-värden är relativa mot talskärnan 250 Hz – 4 kHz (referensförskjutning / normalisering, inte en höjning). Läs 9k+ med försiktighet på lossy källor.",
+    note: "Brusgolvet mäts absolut och stiger när filen lyfts. Signal/brus är det värde som beskriver bearbetningen.",
+    processed: "Bearbetad på egen hårdvara inom EU",
+    location: "Örebro, Sverige",
+    reportSuffix: "leveransrapport",
+  },
+} as const;
 
 const MODES: { value: Mode; label: string }[] = [
   { value: "mild", label: "mild (80 Hz)" },
@@ -103,6 +142,42 @@ function passesLufs(measured: number, target: number, tol: number): boolean {
   return isFinite(measured) && Math.abs(measured - target) <= tol;
 }
 
+function reportLocaleForSpec(spec: SpecEntry, specKey = ""): ReportLocale {
+  const hay = `${spec.label} ${specKey}`.toLowerCase();
+  return /audiobook\s*nordic|audiobook_nordic|nordic\s*audiobook/.test(hay)
+    ? "sv"
+    : "en";
+}
+
+function formatDecimal(
+  value: number,
+  digits: number,
+  locale: ReportLocale,
+): string {
+  const raw = value.toFixed(digits);
+  return locale === "sv" ? raw.replace(".", ",") : raw;
+}
+
+function fmtLocale(
+  v: number | null | undefined,
+  unit: string,
+  locale: ReportLocale,
+  digits = 1,
+): string {
+  if (v == null || !isFinite(v)) return "–";
+  return `${formatDecimal(v, digits, locale)}${unit}`;
+}
+
+function formatSignedDeltaDb(v: number, locale: ReportLocale): string {
+  const sign = v >= 0 ? "+" : "";
+  return `${sign}${formatDecimal(v, 1, locale)} dB`;
+}
+
+function snrDb(lufs: number, noiseDb: number | null): number | null {
+  if (noiseDb == null || !isFinite(lufs) || !isFinite(noiseDb)) return null;
+  return lufs - noiseDb;
+}
+
 type SpecRowStatus = "pass" | "fail" | "n/a";
 
 type SpecEvalRow = {
@@ -111,6 +186,8 @@ type SpecEvalRow = {
   after: string;
   requirement: string;
   status: SpecRowStatus;
+  /** When set, shown in the result column instead of PASS/FAIL. */
+  outcome?: string;
 };
 
 function evaluateSpecRows(
@@ -119,47 +196,62 @@ function evaluateSpecRows(
   after: AnalysisResult,
   beforeNoiseDb: number | null,
   afterNoiseDb: number,
+  locale: ReportLocale = "en",
 ): SpecEvalRow[] {
+  const copy = REPORT_COPY[locale];
   const tol = lufsTolerance(spec);
   const lufsOk = passesLufs(after.integratedLufs, spec.lufs, tol);
   const dbtpOk = passesCeiling(after.truePeakDb, spec.dbtp);
   const brusOk = passesCeiling(afterNoiseDb, spec.brusgolv);
+  const beforeSnr = snrDb(before.integratedLufs, beforeNoiseDb);
+  const afterSnr = snrDb(after.integratedLufs, afterNoiseDb);
+  const snrDelta =
+    beforeSnr != null && afterSnr != null ? afterSnr - beforeSnr : null;
 
   return [
     {
       parameter: "LUFS",
-      before: fmt(before.integratedLufs, " LUFS"),
-      after: fmt(after.integratedLufs, " LUFS"),
-      requirement: `${spec.lufs.toFixed(1)} ± ${tol.toFixed(1)} LUFS`,
+      before: fmtLocale(before.integratedLufs, " LUFS", locale),
+      after: fmtLocale(after.integratedLufs, " LUFS", locale),
+      requirement: `${formatDecimal(spec.lufs, 1, locale)} ± ${formatDecimal(tol, 1, locale)} LUFS`,
       status: lufsOk ? "pass" : "fail",
     },
     {
       parameter: "dBTP",
-      before: fmt(before.truePeakDb, " dBTP"),
-      after: fmt(after.truePeakDb, " dBTP"),
-      requirement: `≤ ${spec.dbtp.toFixed(1)} dBTP`,
+      before: fmtLocale(before.truePeakDb, " dBTP", locale),
+      after: fmtLocale(after.truePeakDb, " dBTP", locale),
+      requirement: `≤ ${formatDecimal(spec.dbtp, 1, locale)} dBTP`,
       status: dbtpOk ? "pass" : "fail",
     },
     {
       parameter: "LRA",
-      before: fmt(before.lra, " LU"),
-      after: fmt(after.lra, " LU"),
+      before: fmtLocale(before.lra, " LU", locale),
+      after: fmtLocale(after.lra, " LU", locale),
       requirement: "—",
       status: "n/a",
     },
     {
       parameter: "PLR",
-      before: fmt(before.plr, " dB"),
-      after: fmt(after.plr, " dB"),
+      before: fmtLocale(before.plr, " dB", locale),
+      after: fmtLocale(after.plr, " dB", locale),
       requirement: "—",
       status: "n/a",
     },
     {
-      parameter: "Noise floor",
-      before: fmt(beforeNoiseDb, " dBFS", 0),
-      after: fmt(afterNoiseDb, " dBFS", 0),
-      requirement: `≤ ${spec.brusgolv.toFixed(0)} dBFS`,
+      parameter: copy.noiseFloor,
+      before: fmtLocale(beforeNoiseDb, " dBFS", locale, 0),
+      after: fmtLocale(afterNoiseDb, " dBFS", locale, 0),
+      requirement: `≤ ${formatDecimal(spec.brusgolv, 0, locale)} dBFS`,
       status: brusOk ? "pass" : "fail",
+    },
+    {
+      parameter: copy.snr,
+      before: fmtLocale(beforeSnr, " dB", locale),
+      after: fmtLocale(afterSnr, " dB", locale),
+      requirement: "—",
+      status: "n/a",
+      outcome:
+        snrDelta == null ? "—" : formatSignedDeltaDb(snrDelta, locale),
     },
   ];
 }
@@ -184,9 +276,19 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function deliveryReportBasename(originalName: string): string {
+function deliveryReportBasename(
+  originalName: string,
+  locale: ReportLocale,
+): string {
   const base = originalName.replace(/\.[^.]+$/, "") || "master";
-  return `${base}_delivery-report.html`;
+  return `${base}_${REPORT_COPY[locale].reportSuffix}.html`;
+}
+
+function reportDateLabel(locale: ReportLocale): string {
+  return new Date().toLocaleString(locale === "sv" ? "sv-SE" : "en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function buildDeliveryReportHtml(opts: {
@@ -194,31 +296,39 @@ function buildDeliveryReportHtml(opts: {
   dateLabel: string;
   specLabel: string;
   rows: SpecEvalRow[];
+  locale: ReportLocale;
 }): string {
+  const copy = REPORT_COPY[opts.locale];
+  const statusLabel =
+    opts.locale === "sv" ? statusLabelSv : statusLabelEn;
   const rowHtml = opts.rows
     .map((row) => {
+      // Signal/noise is informational — never pass/fail, never red.
       const cls =
-        row.status === "pass"
-          ? "pass"
-          : row.status === "fail"
-            ? "fail"
-            : "na";
+        row.outcome != null
+          ? "na"
+          : row.status === "pass"
+            ? "pass"
+            : row.status === "fail"
+              ? "fail"
+              : "na";
+      const resultText = row.outcome ?? statusLabel(row.status);
       return `<tr>
   <td>${escapeHtml(row.parameter)}</td>
   <td>${escapeHtml(row.before)}</td>
   <td>${escapeHtml(row.after)}</td>
   <td>${escapeHtml(row.requirement)}</td>
-  <td class="status ${cls}">${escapeHtml(statusLabelEn(row.status))}</td>
+  <td class="status ${cls}">${escapeHtml(resultText)}</td>
 </tr>`;
     })
     .join("\n");
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${opts.locale}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Delivery report — ${escapeHtml(opts.filename)}</title>
+<title>${escapeHtml(copy.title)} — ${escapeHtml(opts.filename)}</title>
 <style>
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -237,6 +347,10 @@ function buildDeliveryReportHtml(opts: {
   .status.pass { color: #1e6b3a; }
   .status.fail { color: #b3261e; }
   .status.na { color: #888; }
+  .note {
+    margin: 16px 0 0;
+    font-size: 12px; color: #555; max-width: 72ch;
+  }
   .method {
     margin: 28px 0 0; padding-top: 16px; border-top: 1px solid #ddd;
     font-size: 12px; color: #555; max-width: 72ch;
@@ -253,31 +367,32 @@ function buildDeliveryReportHtml(opts: {
 </style>
 </head>
 <body>
-  <h1>Delivery report</h1>
+  <h1>${escapeHtml(copy.title)}</h1>
   <p class="meta">
-    <strong>File:</strong> ${escapeHtml(opts.filename)}<br />
-    <strong>Date:</strong> ${escapeHtml(opts.dateLabel)}<br />
-    <strong>Target spec:</strong> ${escapeHtml(opts.specLabel)}
+    <strong>${escapeHtml(copy.file)}:</strong> ${escapeHtml(opts.filename)}<br />
+    <strong>${escapeHtml(copy.date)}:</strong> ${escapeHtml(opts.dateLabel)}<br />
+    <strong>${escapeHtml(copy.spec)}:</strong> ${escapeHtml(opts.specLabel)}
   </p>
   <table>
     <thead>
       <tr>
-        <th>Parameter</th>
-        <th>Before</th>
-        <th>After</th>
-        <th>Requirement</th>
-        <th>Result</th>
+        <th>${escapeHtml(copy.parameter)}</th>
+        <th>${escapeHtml(copy.before)}</th>
+        <th>${escapeHtml(copy.after)}</th>
+        <th>${escapeHtml(copy.requirement)}</th>
+        <th>${escapeHtml(copy.result)}</th>
       </tr>
     </thead>
     <tbody>
 ${rowHtml}
     </tbody>
   </table>
-  <p class="method">${escapeHtml(METHODOLOGY)}</p>
+  <p class="note">${escapeHtml(copy.note)}</p>
+  <p class="method">${escapeHtml(copy.methodology)}</p>
   <footer>
-    Saltwaves Studio · Marcus Bornold · Örebro, Sweden ·
+    Saltwaves Studio · Marcus Bornold · ${escapeHtml(copy.location)} ·
     <a href="mailto:hello@saltwaves.studio">hello@saltwaves.studio</a><br />
-    Processed on own hardware inside the EU
+    ${escapeHtml(copy.processed)}
   </footer>
 </body>
 </html>`;
@@ -917,23 +1032,23 @@ export default function LocalRunPanel() {
               ) {
                 return;
               }
+              const locale = reportLocaleForSpec(selectedSpec, specKey);
               const rows = evaluateSpecRows(
                 selectedSpec,
                 beforeResult,
                 afterResult,
                 beforeNoiseFloorDb,
                 noiseFloorDb,
+                locale,
               );
               const html = buildDeliveryReportHtml({
                 filename: file.name,
-                dateLabel: new Date().toLocaleString("en-GB", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                }),
+                dateLabel: reportDateLabel(locale),
                 specLabel: selectedSpec.label,
                 rows,
+                locale,
               });
-              downloadBlob(deliveryReportBasename(file.name), html);
+              downloadBlob(deliveryReportBasename(file.name, locale), html);
             }}
           >
             Ladda ner rapport
