@@ -8,7 +8,7 @@ import { Wordmark, WaveBars, VUMeter, demoAudio } from "./saltwaves-ui";
 const navItems = [
   { href: "/#demo", label: "Hear it" },
   { href: "/services", label: "Post-production" },
-  { href: "/tjanster", label: "Consulting" },
+  { href: "/services", label: "Post-production" },
   { href: "/pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },
   { href: "/founding", label: "Founding", highlight: true },
@@ -501,7 +501,7 @@ export function Footer({ omitFounding = false }: { omitFounding?: boolean } = {}
                   <li><a href="/founding">Founding</a></li>
                 )}
                 <li><a href="/services">Post-production</a></li>
-                <li><a href="/tjanster">Consulting</a></li>
+                <li><a href="/services">Post-production</a></li>
                 <li><a href="mailto:hello@saltwaves.studio">Contact</a></li>
               </ul>
             </div>
