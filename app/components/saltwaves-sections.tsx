@@ -8,7 +8,6 @@ import { Wordmark, WaveBars, VUMeter, demoAudio } from "./saltwaves-ui";
 const navItems = [
   { href: "/#demo", label: "Hear it" },
   { href: "/services", label: "Post-production" },
-  { href: "/tjanster", label: "Consulting" },
   { href: "/pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },
   { href: "/founding", label: "Founding", highlight: true },
@@ -468,7 +467,7 @@ function SocialIcon({ kind }: any) {
   );
 }
 
-export function Footer({ omitFounding = false }: { omitFounding?: boolean } = {}) {
+export function Footer({ omitFounding = false, b2b = false }: { omitFounding?: boolean; b2b?: boolean } = {}) {
   return (
     <footer className="footer" data-screen-label="Footer">
       <div className="container">
@@ -480,19 +479,25 @@ export function Footer({ omitFounding = false }: { omitFounding?: boolean } = {}
             </p>
             <div className="footer-social">
               <a href="https://www.linkedin.com/in/marcus-bornold-9152a3407/" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><SocialIcon kind="linkedin" /></a>
-              <a href="https://www.youtube.com/@saltwavestudio" aria-label="YouTube" target="_blank" rel="noopener noreferrer"><SocialIcon kind="youtube" /></a>
-              <a href="https://www.instagram.com/podmaster.studio/" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><SocialIcon kind="instagram" /></a>
+              {!b2b && (
+                <>
+                  <a href="https://www.youtube.com/@saltwavestudio" aria-label="YouTube" target="_blank" rel="noopener noreferrer"><SocialIcon kind="youtube" /></a>
+                  <a href="https://www.instagram.com/podmaster.studio/" aria-label="Instagram" target="_blank" rel="noopener noreferrer"><SocialIcon kind="instagram" /></a>
+                </>
+              )}
             </div>
           </div>
           <div className="footer-cols">
-            <div className="footer-col">
-              <h4>Tools</h4>
-              <ul>
-                <li><a href="/#try">PodMaster</a></li>
-                <li><a href="https://saltwaves.studio/promptermaster">PrompterMaster</a></li>
-                <li><a href="https://saltwaves.studio/podcast-loudness-checker">Loudness Inspector</a></li>
-              </ul>
-            </div>
+            {!b2b && (
+              <div className="footer-col">
+                <h4>Tools</h4>
+                <ul>
+                  <li><a href="/#try">PodMaster</a></li>
+                  <li><a href="https://saltwaves.studio/promptermaster">PrompterMaster</a></li>
+                  <li><a href="https://saltwaves.studio/podcast-loudness-checker">Loudness Inspector</a></li>
+                </ul>
+              </div>
+            )}
             <div className="footer-col">
               <h4>Company</h4>
               <ul>
@@ -500,9 +505,10 @@ export function Footer({ omitFounding = false }: { omitFounding?: boolean } = {}
                 {!omitFounding && (
                   <li><a href="/founding">Founding</a></li>
                 )}
-                <li><a href="/services">Post-production</a></li>
-                <li><a href="/tjanster">Consulting</a></li>
-                <li><a href="mailto:hello@saltwaves.studio">Contact</a></li>
+                {!b2b && (
+                  <li><a href="/services">Post-production</a></li>
+                )}
+                <li><a href={b2b ? "mailto:marcus@saltwaves.studio" : "mailto:hello@saltwaves.studio"}>Contact</a></li>
               </ul>
             </div>
             <div className="footer-col">

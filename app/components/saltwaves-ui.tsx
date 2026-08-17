@@ -462,6 +462,8 @@ export const demoAudio = (() => {
     mastered: "/hero/hero_after.mp3",
     "audiobook-raw": "/hero/hero_before.mp3",
     "audiobook-mastered": "/hero/hero_after_audiobook.mp3",
+    "forlag-raw": "/hero/forlag_before.mp3",
+    "forlag-mastered": "/hero/forlag_after.mp3",
   };
   let current: HTMLAudioElement | null = null;
   let onEndCb: (() => void) | null = null;

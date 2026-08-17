@@ -8,7 +8,7 @@ export default function PostProductionLayout({
   return (
     <>
       {children}
-      <Footer omitFounding />
+      <Footer omitFounding b2b />
     </>
   );
 }
