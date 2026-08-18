@@ -15,6 +15,31 @@ export type AbPageConfig = {
 };
 
 export const AB_PAGES: Record<string, AbPageConfig> = {
+  "tal-k4n2": {
+    slug: "tal-k4n2",
+    title: "Inspelat tal, vanligt rum",
+    eyebrow: "Saltwaves · A/B",
+    subtitle:
+      "Samma tagning före och efter kedjan. Växla A/B under uppspelning. Nivåerna är som de levererats, ingen nivåmatchning. Utsnitt om 45 sekunder, mål: nordisk ljudbokspec.",
+    trackA: {
+      src: "/ab/tal-k4n2/tal-a-before.mp3",
+      label: "A · Rå inspelning",
+      hint: "Vanligt rum, dynamisk mikrofon",
+    },
+    trackB: {
+      src: "/ab/tal-k4n2/tal-b-after.mp3",
+      label: "B · Efter Saltwaves-kedjan",
+      hint: "Mastrad mot leveransspec",
+    },
+    findings: [
+      "Rå inspelning: −38,6 LUFS · −18,7 dBTP",
+      "Efter kedjan: −18,0 LUFS · −2,9 dBTP (levererad wav mäter −3,1; mp3-kodningen lyfter toppen två tiondelar)",
+      "Brusgolv över hela filen: −73 → −60 dBFS. Utan bearbetning hade lyftet tagit golvet till cirka −49 dBFS",
+      "Mål här: nordisk ljudbokspec, −18,0 LUFS ±0,5 och true peak ≤ −3,0 dBTP. Kedjan kör mot den spec ni levererar mot, oavsett om det är ljudbok, e-learning eller podd",
+      "Kedjan gör en genomkörning per fil utan anpassning per talare. Byggd för en röst i taget",
+      "Nivåerna är som de levererats, ingen nivåmatchning",
+    ],
+  },
   "faltinspelning-0abd": {
     slug: "faltinspelning-0abd",
     title: "Fältinspelning",
