@@ -83,16 +83,15 @@ export default function PostProductionPage() {
           <div className="reveal in">
             <div className="kicker">Post-production</div>
             <h1 style={{ fontSize: "clamp(2.7rem, 5.6vw, 4.4rem)", marginBottom: 20 }}>
-              Your catalogue doesn&apos;t sound like one catalogue.
+              Consistent sound across your entire catalogue.
             </h1>
             <p className="section-sub" style={{ marginBottom: 18 }}>
-              Different rooms, different mics, different people editing. Every episode lands
-              somewhere slightly different — and the only fix that scales is a final pass that
-              treats all of them the same way.
+              You send finished edits. You get back files that meet your delivery spec, with a
+              measurement report showing exactly what was done. Normally within 24 hours.
             </p>
             <p className="section-sub" style={{ marginBottom: 28 }}>
               I&apos;ve spent twenty years behind the console. Live sound, broadcast, TV,
-              streaming. Saltwaves is that pass, run consistently, on whatever you send.
+              streaming. Saltwaves is the last step, run the same way every time.
             </p>
             <a className="btn btn-primary" href={MAIL}>
               Send a file
