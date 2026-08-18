@@ -20,7 +20,7 @@ export const AB_PAGES: Record<string, AbPageConfig> = {
     title: "Fältinspelning",
     eyebrow: "Saltwaves · private A/B review",
     subtitle:
-      "A raw field recording, straight off the recorder, against the same 60 seconds through the Saltwaves mastering chain at EBU R128 broadcast spec. Both tracks land within 0.1 LU of each other, so nothing you hear is a loudness difference. It is noise, room and clipping.",
+      "A raw field recording, straight off the recorder, against the same 35 seconds through the Saltwaves mastering chain at EBU R128 broadcast spec. Identical window in both tracks, no level matching.",
     trackA: {
       src: "/ab/faltinspelning-0abd/falt-a-before.mp3",
       label: "A · Raw field recording",
@@ -32,37 +32,13 @@ export const AB_PAGES: Record<string, AbPageConfig> = {
       hint: "Broadcast −23 LUFS",
     },
     findings: [
-      "Raw field recording, this excerpt: −24.0 LUFS · +1.9 dBTP · LRA 4.3 LU · noise floor −50.3 dB",
-      "After Saltwaves chain: −24.0 LUFS · −4.9 dBTP · LRA 5.1 LU · noise floor −78.3 dB",
-      "The two tracks sit 0.01 LU apart. No level matching was applied — the raw take happened to land on the broadcast target already, so the comparison is processing only",
-      "The raw take clips: 447 samples pinned at full scale in the source recording, and this excerpt still reconstructs to +1.9 dBTP, above digital zero. After the chain, true peak is −4.9 dBTP",
-      "Noise floor drops 27.9 dB. Broadcast spec asks for −55 dB; the raw take missed it at −50.3 dB and lands at −78.3 dB after",
-      "Chain: DeepFilterNet3 on a Saltwaves-trained checkpoint, 90 Hz low-cut, condenser presence curve — 12.0 dB cut at 586 Hz (boxiness), 5.5 dB at 2.5 kHz (presence peak)",
-      "60-second excerpt from 00:30, identical window in both tracks",
-    ],
-  },
-  "earselect-h3m9": {
-    slug: "earselect-h3m9",
-    title: "Uppläsare i hemmastudio",
-    eyebrow: "Saltwaves · privat A/B",
-    subtitle:
-      "Samma tagning före och efter kedjan. Växla A/B under uppspelning. Nivåerna är som de levererats, ingen nivåmatchning. Utsnitt om 45 sekunder, mål: nordisk ljudbokspec.",
-    trackA: {
-      src: "/ab/earselect-h3m9/forlag-a-before.mp3",
-      label: "A · Rå inläsning",
-      hint: "Vanligt rum, dynamisk mikrofon",
-    },
-    trackB: {
-      src: "/ab/earselect-h3m9/forlag-b-after.mp3",
-      label: "B · Efter Saltwaves-kedjan",
-      hint: "Mastrad mot ljudbokspec",
-    },
-    findings: [
-      "Rå inläsning: −38,6 LUFS · −18,7 dBTP",
-      "Efter kedjan: −18,0 LUFS · −2,9 dBTP (levererad wav mäter −3,1; mp3-kodningen lyfter toppen två tiondelar)",
-      "Brusgolv över hela filen: −73 → −60 dBFS. Utan bearbetning hade lyftet tagit golvet till cirka −49 dBFS",
-      "Mål: nordisk ljudbokspec, −18,0 LUFS ±0,5 och true peak ≤ −3,0 dBTP",
-      "Nivåerna är som de levererats, ingen nivåmatchning",
+      "Raw field recording, this excerpt: −24.0 LUFS · −5.9 dBTP · LRA 6.2 LU",
+      "After Saltwaves chain: −23.3 LUFS · −6.3 dBTP · LRA 5.1 LU",
+      "The two tracks sit 0.7 LU apart. No level matching was applied — the raw take was already close to the broadcast target, so most of what you hear is processing, not level",
+      "Delivered master measures −22.8 LUFS with a noise floor at −65 dBFS. Broadcast spec asks for −23.0 ±0.5 LUFS, true peak ≤ −1.0 dBTP and a noise floor under −55 dBFS. All three pass",
+      "Long-term spectrum: rumble below 80 Hz down 5.8 dB, warmth and body up around 1.5 dB, 6–9 kHz up 4.2 dB relative to the speech core",
+      "Chain: DeepFilterNet3 on a Saltwaves-trained checkpoint, 90 Hz low-cut, condenser presence curve",
+      "35-second excerpt, identical window in both tracks",
     ],
   },
   "npf-podden-x7k4": {
