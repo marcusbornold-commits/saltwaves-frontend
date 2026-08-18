@@ -7,8 +7,8 @@ import { DemoCard } from "./saltwaves-sections";
 /* Mätvärden för exempelfilen. Ligger samlade här så att de går att byta
    på ett ställe när ljudfilen byts. */
 const EXEMPEL = {
-  fore: "−42,2 LUFS integrerat · −21,7 dBTP",
-  efter: "−18,3 LUFS integrerat · −3,0 dBTP",
+  fore: "−38,6 LUFS integrerat · −18,7 dBTP",
+  efter: "−18,0 LUFS integrerat · −2,9 dBTP",
   brusgolvFore: "−73 dBFS",
   brusgolvEfter: "−60 dBFS",
 };
@@ -22,16 +22,16 @@ const CELL: React.CSSProperties = {
 const RAPPORT = [
   {
     parameter: "Integrerad loudness",
-    fore: "−42,2 LUFS",
-    efter: "−18,3 LUFS",
+    fore: "−38,6 LUFS",
+    efter: "−18,0 LUFS",
     krav: "−18,0 ± 0,5",
     utfall: "OK",
     ok: true,
   },
   {
     parameter: "True peak",
-    fore: "−21,7 dBTP",
-    efter: "−3,0 dBTP",
+    fore: "−18,7 dBTP",
+    efter: "−2,9 dBTP",
     krav: "≤ −3,0",
     utfall: "OK",
     ok: true,
@@ -218,8 +218,8 @@ export default function PostproduktionSida() {
           <p className="demo-caption reveal">
             Brusgolvet gick från {EXEMPEL.brusgolvFore} till {EXEMPEL.brusgolvEfter}, trots ett
             lyft på nästan 24 decibel. Utan bearbetning hade det landat elva decibel utanför
-            spec. Det är den delen som inte gör sig själv. Värdena gäller det 45 sekunder
-            långa utsnittet. Brusgolvet är mätt på hela filen.
+            spec. Det är den delen som inte gör sig själv. Loudness och true peak gäller det
+            45 sekunder långa utsnittet. Brusgolvet är mätt på hela filen.
           </p>
 
           <div className="reveal" style={{ marginTop: 32, maxWidth: 720 }}>
