@@ -15,6 +15,31 @@ export type AbPageConfig = {
 };
 
 export const AB_PAGES: Record<string, AbPageConfig> = {
+  "speech-k4n2": {
+    slug: "speech-k4n2",
+    title: "Recorded speech, ordinary room",
+    eyebrow: "Saltwaves · A/B",
+    subtitle:
+      "The same take before and after the chain. Toggle A/B while playing. Levels are as delivered, with no level matching. 45-second excerpt, target: Nordic audiobook spec. The narration is in Swedish.",
+    trackA: {
+      src: "/ab/speech-k4n2/speech-a-before.mp3",
+      label: "A · Raw recording",
+      hint: "Ordinary room, dynamic mic",
+    },
+    trackB: {
+      src: "/ab/speech-k4n2/speech-b-after.mp3",
+      label: "B · After Saltwaves chain",
+      hint: "Mastered to delivery spec",
+    },
+    findings: [
+      "Raw recording: −38.6 LUFS · −18.7 dBTP",
+      "After the chain: −18.0 LUFS · −2.9 dBTP (the delivered wav measures −3.1; mp3 encoding lifts true peak by two tenths)",
+      "Noise floor across the full file: −73 → −60 dBFS. Without processing, the gain would have taken the floor to roughly −49 dBFS",
+      "Target here: Nordic audiobook spec, −18.0 LUFS ±0.5 and true peak ≤ −3.0 dBTP. The chain runs against whatever spec you deliver to, audiobook, e-learning or podcast",
+      "One pass per file, with no per-speaker adaptation. Built for one voice at a time",
+      "Levels are as delivered — no level matching",
+    ],
+  },
   "tal-k4n2": {
     slug: "tal-k4n2",
     title: "Inspelat tal, vanligt rum",
