@@ -211,7 +211,7 @@ export function UploadZone({
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
   const [micType, setMicType] = useState<MicType>("unknown");
   const [email, setEmail] = useState("");
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [uploadBytes, setUploadBytes] = useState<{ loaded: number; total: number } | null>(null);
 
   const rejectForLimit = (f: any, message: string) => {
