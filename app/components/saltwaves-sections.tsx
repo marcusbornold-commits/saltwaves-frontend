@@ -521,7 +521,7 @@ export function Footer({ omitFounding = false, b2b = false }: { omitFounding?: b
           </div>
         </div>
         <div className="footer-base microcopy">
-          <span>© 2026 Saltwaves Studio · Marcus Bornold · F-skatt · Örebro, Sweden</span>
+          <span>© {new Date().getFullYear()} Saltwaves Studio · Marcus Bornold · F-skatt · Örebro, Sweden</span>
           <span>Mastered, not generated.</span>
         </div>
       </div>
