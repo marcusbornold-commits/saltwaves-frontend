@@ -69,7 +69,7 @@ export function VUMeter({ lit = 9, total = 14, live = true }: any) {
 }
 
 /* ---------- Upload zone (functional; placeholder backend handler) ---------- */
-function formatBytes(b: any) {
+function formatBytes(b: number) {
   if (b > 1048576) return (b / 1048576).toFixed(1) + " MB";
   if (b > 1024) return (b / 1024).toFixed(0) + " KB";
   return b + " B";
