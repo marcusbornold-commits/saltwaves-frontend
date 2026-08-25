@@ -10,7 +10,7 @@ import {
 
 const API = "http://127.0.0.1:8766";
 // Bumpa denna när runner.py:s version bumpas.
-const EXPECTED_RUNNER_VERSION = "4-lufs";
+const EXPECTED_RUNNER_VERSION = "6-jobs-dir";
 const HEALTH_POLL_MS = 5000;
 
 type HealthInfo = {
@@ -35,6 +35,11 @@ function formatStarted(iso: string): string {
 }
 
 /** Upward process timer: mm:ss, or h:mm:ss once past an hour. */
+function fmtMeasure(value: number | null, digits = 1): string {
+  if (value == null || !Number.isFinite(value)) return "n/a";
+  return value.toFixed(digits);
+}
+
 function formatElapsed(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
   const h = Math.floor(s / 3600);
@@ -48,6 +53,23 @@ function formatElapsed(totalSeconds: number): string {
 
 type Mode = "mild" | "standard" | "strong";
 type MicType = "dynamic" | "condenser" | "headset" | "unknown";
+type TalkMic = "dynamic" | "condenser" | "headset";
+type WorkMode = "single" | "multi";
+
+type PreflightFile = {
+  filename: string;
+  duration: number;
+  sample_rate: number;
+  channels: number;
+  integrated_lufs: number | null;
+  true_peak: number | null;
+  room: boolean;
+};
+
+type JobFolder = {
+  name: string;
+  wav_count: number;
+};
 
 type SpecEntry = {
   label: string;
@@ -126,6 +148,12 @@ const MICS: { value: MicType; label: string }[] = [
   { value: "condenser", label: "condenser" },
   { value: "headset", label: "headset" },
   { value: "unknown", label: "Okänd / auto" },
+];
+
+const TALK_MICS: { value: TalkMic; label: string }[] = [
+  { value: "dynamic", label: "dynamic" },
+  { value: "condenser", label: "condenser" },
+  { value: "headset", label: "headset" },
 ];
 
 const REPORT_LOCALES: { value: ReportLocale; label: string }[] = [
@@ -523,6 +551,15 @@ export default function LocalRunPanel() {
   const [noiseFloorDb, setNoiseFloorDb] = useState<number | null>(null);
   const [analysisError, setAnalysisError] = useState("");
 
+  const [workMode, setWorkMode] = useState<WorkMode>("single");
+  const [jobFolders, setJobFolders] = useState<JobFolder[]>([]);
+  const [jobFoldersError, setJobFoldersError] = useState("");
+  const [selectedJob, setSelectedJob] = useState("");
+  const [preflightFiles, setPreflightFiles] = useState<PreflightFile[]>([]);
+  const [preflightError, setPreflightError] = useState("");
+  const [micsByFile, setMicsByFile] = useState<Record<string, TalkMic | "">>({});
+  const [mtOutDir, setMtOutDir] = useState("");
+
   const markRunnerDown = useCallback(() => {
     setRunnerForceDown(true);
     setRunnerStatus("down");
@@ -550,6 +587,38 @@ export default function LocalRunPanel() {
       if (healthPollRef.current) clearInterval(healthPollRef.current);
     };
   }, [pollHealth]);
+
+  const loadJobFolders = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/multitrack/jobs`);
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        jobs?: JobFolder[];
+      };
+      if (!res.ok || data.ok === false) {
+        setJobFolders([]);
+        setJobFoldersError(data.error || "Kunde inte lista jobbmappar.");
+        return;
+      }
+      const jobs = data.jobs || [];
+      setJobFolders(jobs);
+      setJobFoldersError("");
+      setSelectedJob((prev) =>
+        prev && jobs.some((job) => job.name === prev) ? prev : "",
+      );
+    } catch (e) {
+      setJobFolders([]);
+      setJobFoldersError(
+        e instanceof Error ? e.message : "Kunde inte lista jobbmappar.",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (workMode !== "multi") return;
+    void loadJobFolders();
+  }, [workMode, loadJobFolders]);
 
   const restartRunner = async () => {
     setRestarting(true);
@@ -752,7 +821,151 @@ export default function LocalRunPanel() {
     }
   };
 
+  const pollMultitrack = useCallback((id: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      void (async () => {
+        try {
+          const res = await fetch(`${API}/multitrack/job/${id}`);
+          if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+          const data = (await res.json()) as {
+            status: string;
+            phase: string;
+            error?: string;
+            out_dir?: string;
+          };
+          setStatusText(data.phase || data.status);
+          setJobLog(data.phase || "");
+          if (data.out_dir) setMtOutDir(data.out_dir);
+          if (data.status === "running") return;
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          if (data.status === "error") {
+            setPhase("error");
+            setServerError(data.error || data.phase || "Multitrack misslyckades.");
+            return;
+          }
+          setPhase("done");
+          setStatusText("Klar");
+        } catch (e) {
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          if (isNetworkFetchError(e)) markRunnerDown();
+          setPhase("error");
+          setServerError(
+            isNetworkFetchError(e)
+              ? "Jobbpolling misslyckades — runner nås inte (Failed to fetch)."
+              : e instanceof Error
+                ? e.message
+                : "Kunde inte läsa jobbstatus.",
+          );
+        }
+      })();
+    }, 2000);
+  }, [markRunnerDown]);
+
+  const runPreflight = async () => {
+    if (!selectedJob) return;
+    setPreflightError("");
+    setServerError("");
+    setMtOutDir("");
+    setPhase("running");
+    setStatusText("Kontrollerar");
+    try {
+      const res = await fetch(`${API}/multitrack/preflight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder: selectedJob }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        files?: PreflightFile[];
+      };
+      const files = data.files || [];
+      setPreflightFiles(files);
+      const nextMics: Record<string, TalkMic | ""> = {};
+      for (const row of files) {
+        if (!row.room) nextMics[row.filename] = micsByFile[row.filename] || "";
+      }
+      setMicsByFile(nextMics);
+      if (!res.ok || data.ok === false) {
+        setPreflightError(data.error || "Förhandskontrollen misslyckades.");
+        setPhase("error");
+        setStatusText("Fel");
+        return;
+      }
+      setPhase("idle");
+      setStatusText("");
+    } catch (e) {
+      if (isNetworkFetchError(e)) markRunnerDown();
+      setPhase("error");
+      setStatusText("Fel");
+      setPreflightError(
+        e instanceof Error ? e.message : "Förhandskontrollen misslyckades.",
+      );
+    }
+  };
+
+  const runMultitrack = async () => {
+    if (!selectedJob || !specKey) return;
+    const mics: Record<string, TalkMic> = {};
+    for (const row of preflightFiles) {
+      if (row.room) continue;
+      const chosen = micsByFile[row.filename];
+      if (!chosen) {
+        setServerError(`Välj mikrofontyp för ${row.filename}.`);
+        setPhase("error");
+        setStatusText("Fel");
+        return;
+      }
+      mics[row.filename] = chosen;
+    }
+    resetResults();
+    setMtOutDir("");
+    jobStartRef.current = Date.now();
+    setElapsedSec(0);
+    setPhase("running");
+    setStatusText(`Bearbetar spår 1 av ${preflightFiles.length}`);
+    try {
+      const res = await fetch(`${API}/multitrack/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folder: selectedJob,
+          spec: specKey,
+          mode,
+          mics,
+        }),
+      });
+      const data = (await res.json()) as {
+        id?: string;
+        error?: string;
+        out_dir?: string;
+      };
+      if (!res.ok || !data.id) {
+        throw new Error(data.error || "Kunde inte starta multitrack.");
+      }
+      setJobId(data.id);
+      if (data.out_dir) setMtOutDir(data.out_dir);
+      pollMultitrack(data.id);
+    } catch (e) {
+      if (isNetworkFetchError(e)) markRunnerDown();
+      setPhase("error");
+      setStatusText("Fel");
+      setServerError(
+        e instanceof Error ? e.message : "Kunde inte starta multitrack.",
+      );
+    }
+  };
+
   const selectedSpec = specKey ? specs[specKey] : null;
+  const talkTracks = preflightFiles.filter((row) => !row.room);
+  const allMicsChosen = talkTracks.every((row) => Boolean(micsByFile[row.filename]));
   const runnerDown = runnerForceDown || runnerStatus === "down";
   const versionStale =
     runnerStatus === "up" &&
@@ -865,6 +1078,30 @@ export default function LocalRunPanel() {
         </div>
       </div>
 
+      <div className="lr-mode-switch" role="tablist" aria-label="Körläge">
+        <button
+          type="button"
+          role="tab"
+          className={`lr-mode-btn${workMode === "single" ? " is-on" : ""}`}
+          aria-selected={workMode === "single"}
+          disabled={busy}
+          onClick={() => setWorkMode("single")}
+        >
+          En fil
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`lr-mode-btn${workMode === "multi" ? " is-on" : ""}`}
+          aria-selected={workMode === "multi"}
+          disabled={busy}
+          onClick={() => setWorkMode("multi")}
+        >
+          Multitrack
+        </button>
+      </div>
+
+      {workMode === "single" && (
       <div
         className={`aba-drop lr-drop${file ? " is-done" : ""}`}
         onDragOver={(e) => e.preventDefault()}
@@ -896,6 +1133,39 @@ export default function LocalRunPanel() {
           {file ? file.name : "Dra in råfilen"}
         </span>
       </div>
+      )}
+
+      {workMode === "multi" && (
+        <label className="lr-path">
+          <span className="lr-label">Jobb</span>
+          <select
+            className="lr-select"
+            value={selectedJob}
+            disabled={busy || !jobFolders.length}
+            onChange={(e) => {
+              setSelectedJob(e.target.value);
+              setPreflightFiles([]);
+              setPreflightError("");
+            }}
+          >
+            <option value="">
+              {jobFoldersError
+                ? "Kunde inte lista mappar"
+                : jobFolders.length
+                  ? "Välj jobb"
+                  : "Inga jobbmappar"}
+            </option>
+            {jobFolders.map((job) => (
+              <option key={job.name} value={job.name}>
+                {job.name} ({job.wav_count} wav)
+              </option>
+            ))}
+          </select>
+          {jobFoldersError && (
+            <span className="lr-room-note">{jobFoldersError}</span>
+          )}
+        </label>
+      )}
 
       <div className="lr-controls">
         <label className="lr-field">
@@ -914,6 +1184,7 @@ export default function LocalRunPanel() {
           </select>
         </label>
 
+        {workMode === "single" && (
         <label className="lr-field">
           <span className="lr-label">Rapportspråk</span>
           <select
@@ -928,6 +1199,7 @@ export default function LocalRunPanel() {
             ))}
           </select>
         </label>
+        )}
 
         <label className="lr-field">
           <span className="lr-label">Lågsnitt</span>
@@ -945,6 +1217,7 @@ export default function LocalRunPanel() {
           </select>
         </label>
 
+        {workMode === "single" && (
         <label className="lr-field">
           <span className="lr-label">Mikrofontyp</span>
           <select
@@ -960,7 +1233,9 @@ export default function LocalRunPanel() {
             ))}
           </select>
         </label>
+        )}
 
+        {workMode === "single" ? (
         <button
           type="button"
           className="lr-run"
@@ -969,7 +1244,89 @@ export default function LocalRunPanel() {
         >
           Kör kedjan
         </button>
+        ) : (
+        <button
+          type="button"
+          className="lr-run"
+          disabled={!selectedJob || busy}
+          onClick={() => void runPreflight()}
+        >
+          Kontrollera
+        </button>
+        )}
       </div>
+
+      {workMode === "multi" && preflightFiles.length > 0 && (
+        <div className="lr-table-wrap">
+          <table className="lr-table">
+            <thead>
+              <tr>
+                <th>Fil</th>
+                <th>Längd</th>
+                <th>SR</th>
+                <th>Ch</th>
+                <th>LUFS</th>
+                <th>TP</th>
+                <th>Mikrofon</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preflightFiles.map((row) => (
+                <tr key={row.filename}>
+                  <td>
+                    {row.filename}
+                    {row.room ? " · rum" : ""}
+                  </td>
+                  <td>{fmtMeasure(row.duration, 2)} s</td>
+                  <td>{row.sample_rate}</td>
+                  <td>{row.channels}</td>
+                  <td>{fmtMeasure(row.integrated_lufs)}</td>
+                  <td>{fmtMeasure(row.true_peak)}</td>
+                  <td>
+                    {row.room ? (
+                      <span className="lr-room-note">Ingen NR / inget HP</span>
+                    ) : (
+                      <select
+                        className="lr-select"
+                        value={micsByFile[row.filename] || ""}
+                        disabled={busy}
+                        onChange={(e) =>
+                          setMicsByFile((prev) => ({
+                            ...prev,
+                            [row.filename]: e.target.value as TalkMic | "",
+                          }))
+                        }
+                      >
+                        <option value="">Välj mikrofon</option>
+                        {TALK_MICS.map((m) => (
+                          <option key={m.value} value={m.value}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            className="lr-run"
+            disabled={busy || !specKey || !allMicsChosen || Boolean(preflightError)}
+            onClick={() => void runMultitrack()}
+          >
+            Kör multitrack
+          </button>
+        </div>
+      )}
+
+      {workMode === "multi" && preflightError && (
+        <div className="aba-remote-error" role="alert">
+          <p className="aba-remote-error-title">Fel</p>
+          <pre className="lr-log">{preflightError}</pre>
+        </div>
+      )}
 
       {(statusText || jobLog || elapsedSec != null) && (
         <div className="lr-status" role="status" aria-live="polite">
@@ -982,7 +1339,7 @@ export default function LocalRunPanel() {
           {statusText && phase !== "done" && (
             <p className="lr-status-line">{statusText}</p>
           )}
-          {jobLog && phase !== "done" && (
+          {workMode === "single" && jobLog && phase !== "done" && (
             <pre className="lr-log">{jobLog}</pre>
           )}
         </div>
@@ -995,7 +1352,7 @@ export default function LocalRunPanel() {
         </div>
       )}
 
-      {(beforeResult || afterResult) && (
+      {workMode === "single" && (beforeResult || afterResult) && (
         <AbAnalysisResults
           a={beforeResult}
           b={afterResult}
@@ -1003,7 +1360,7 @@ export default function LocalRunPanel() {
         />
       )}
 
-      {phase === "done" &&
+      {workMode === "single" && phase === "done" &&
         selectedSpec &&
         beforeResult &&
         afterResult &&
@@ -1017,7 +1374,7 @@ export default function LocalRunPanel() {
         />
       )}
 
-      {phase === "done" && jobId && (
+      {workMode === "single" && phase === "done" && jobId && (
         <div className="lr-download">
           <a
             className="lr-run lr-download-btn"
@@ -1069,6 +1426,13 @@ export default function LocalRunPanel() {
           >
             Ladda ner rapport
           </button>
+        </div>
+      )}
+
+      {workMode === "multi" && phase === "done" && (
+        <div className="lr-status" role="status">
+          <p className="lr-status-line">Klar</p>
+          {mtOutDir && <pre className="lr-log">Utdata: {mtOutDir}</pre>}
         </div>
       )}
     </div>
@@ -1125,7 +1489,21 @@ const LOCAL_RUN_CSS = `
   cursor:pointer;font-family:inherit;
 }
 .lr-run:disabled{opacity:.45;cursor:not-allowed}
-.lr-status,.lr-spec,.lr-download{max-width:920px;margin:0 auto 28px}
+.lr-status,.lr-spec,.lr-download,.lr-path,.lr-table-wrap,.lr-mode-switch{max-width:920px;margin:0 auto 28px}
+.lr-mode-switch{display:flex;gap:8px}
+.lr-mode-btn{
+  border:1px solid var(--line);border-radius:10px;padding:8px 14px;
+  background:rgba(255,255,255,.55);font-size:14px;cursor:pointer;font-family:inherit;
+}
+.lr-mode-btn.is-on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.lr-path{display:flex;flex-direction:column;gap:6px}
+.lr-input{
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  background:rgba(255,255,255,.55);font-size:14px;font-family:inherit;
+}
+.lr-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.lr-table th,.lr-table td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.lr-room-note{font-size:12px;color:var(--ink-60)}
 .lr-download{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 .lr-download-btn{display:inline-block;text-decoration:none;text-align:center}
 .lr-download-secondary{
