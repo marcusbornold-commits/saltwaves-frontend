@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { decodeFileTo48k, analyzeChannels, type AnalysisResult } from "@/lib/audio-analysis";
+import { decodeArrayBufferTo48k, analyzeChannels, type AnalysisResult } from "@/lib/audio-analysis";
 import {
   ABA_CSS,
   AbAnalysisResults,
@@ -456,11 +456,11 @@ function estimateNoiseFloorDb(channels: Float32Array[]): number {
 }
 
 async function analyzeWithNoiseFloor(
-  file: File,
+  audio: ArrayBuffer,
   onStatus: (s: string) => void,
 ): Promise<{ result: AnalysisResult; noiseFloorDb: number }> {
   onStatus("Decoding…");
-  const channels = await decodeFileTo48k(file);
+  const channels = await decodeArrayBufferTo48k(audio);
   const durMin = channels[0].length / 48000 / 60;
   if (durMin > 30) {
     onStatus(`Long file (${durMin.toFixed(0)} min) — this can take a while…`);
@@ -725,29 +725,33 @@ export default function LocalRunPanel() {
             setPhase("analyzing");
             setStatusText("Hämtar och analyserar ljud…");
 
-            const [beforeRes, afterRes] = await Promise.all([
-              fetch(`${API}/audio/${id}/before`),
-              fetch(`${API}/audio/${id}/after`),
-            ]);
-            if (!beforeRes.ok || !afterRes.ok) {
-              throw new Error("Kunde inte hämta before/after från servern.");
-            }
+            // En fil i taget, med hämtning direkt före analysen.
+            // Avkodat ljud ligger okomprimerat i minnet (~1,4 GB per timme
+            // stereo). Att hämta och analysera before och after parallellt
+            // höll fyra kopior samtidigt och slog i flikens minnestak på
+            // långa filer: "Array buffer allocation failed".
+            const fetchAudioBytes = async (
+              which: "before" | "after",
+            ): Promise<ArrayBuffer> => {
+              const res = await fetch(`${API}/audio/${id}/${which}`);
+              if (!res.ok) {
+                throw new Error(`Kunde inte hämta ${which} från servern.`);
+              }
+              // Straight to bytes: no Blob and no File wrapper, so the payload
+              // exists once instead of three times. After.wav is uncompressed
+              // and is by far the heaviest thing this page touches.
+              return res.arrayBuffer();
+            };
 
-            const [beforeBlob, afterBlob] = await Promise.all([
-              beforeRes.blob(),
-              afterRes.blob(),
-            ]);
-            const beforeFile = new File([beforeBlob], "before", {
-              type: beforeBlob.type || "audio/*",
-            });
-            const afterFile = new File([afterBlob], "after.wav", {
-              type: "audio/wav",
-            });
+            const beforeAnalysis = await analyzeWithNoiseFloor(
+              await fetchAudioBytes("before"),
+              (s) => setStatusText(`Before — ${s}`),
+            );
 
-            const [beforeAnalysis, afterAnalysis] = await Promise.all([
-              analyzeWithNoiseFloor(beforeFile, () => {}),
-              analyzeWithNoiseFloor(afterFile, (s) => setStatusText(s)),
-            ]);
+            const afterAnalysis = await analyzeWithNoiseFloor(
+              await fetchAudioBytes("after"),
+              (s) => setStatusText(`After — ${s}`),
+            );
 
             setBeforeResult(beforeAnalysis.result);
             setAfterResult(afterAnalysis.result);
