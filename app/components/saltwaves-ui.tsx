@@ -21,8 +21,8 @@ export function Wordmark({ dark, href = "/" }: { dark?: boolean; href?: string }
 }
 
 /* ---------- Deterministic wave bar heights ---------- */
-export function barHeights(n: any, seed: any) {
-  const out = [];
+export function barHeights(n: number, seed: number): number[] {
+  const out: number[] = [];
   for (let i = 0; i < n; i++) {
     const t = i / n;
     const v =
