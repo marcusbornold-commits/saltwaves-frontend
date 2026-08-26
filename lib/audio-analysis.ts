@@ -282,6 +282,10 @@ export async function analyzeChannels(
 
 export async function decodeFileTo48k(file: File): Promise<Float32Array[]> {
   const buf = await file.arrayBuffer();
+  return decodeArrayBufferTo48k(buf);
+}
+
+export async function decodeArrayBufferTo48k(buf: ArrayBuffer): Promise<Float32Array[]> {
   const ctx = new OfflineAudioContext({
     numberOfChannels: 2,
     length: 1,
