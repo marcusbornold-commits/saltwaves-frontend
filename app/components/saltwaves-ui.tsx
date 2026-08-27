@@ -202,7 +202,7 @@ export function UploadZone({
   compact?: boolean;
   access: AccessLevel;
 }) {
-  const [file, setFile] = useState<any>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   // idle | checking | ready | limit-error | working | queued
   const [status, setStatus] = useState("idle");
