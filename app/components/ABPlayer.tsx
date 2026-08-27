@@ -26,10 +26,10 @@ export default function ABPlayer({ config }: { config: AbPageConfig }) {
   const active = () => (slot === "A" ? audioA.current : audioB.current);
   const inactive = () => (slot === "A" ? audioB.current : audioA.current);
 
-  const syncProgress = useCallback(() => {
+  const syncProgress = useCallback(function tick() {
     const el = active();
     if (el) setCurrent(el.currentTime);
-    raf.current = requestAnimationFrame(syncProgress);
+    raf.current = requestAnimationFrame(tick);
   }, [slot]);
 
   useEffect(() => {
