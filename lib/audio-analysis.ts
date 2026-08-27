@@ -280,8 +280,7 @@ export async function analyzeChannels(
   };
 }
 
-export async function decodeFileTo48k(file: File): Promise<Float32Array[]> {
-  const buf = await file.arrayBuffer();
+export async function decodeArrayBufferTo48k(buf: ArrayBuffer): Promise<Float32Array[]> {
   const ctx = new OfflineAudioContext({
     numberOfChannels: 2,
     length: 1,
@@ -292,6 +291,10 @@ export async function decodeFileTo48k(file: File): Promise<Float32Array[]> {
   const out: Float32Array[] = [];
   for (let c = 0; c < nCh; c++) out.push(audio.getChannelData(c));
   return out;
+}
+
+export async function decodeFileTo48k(file: File): Promise<Float32Array[]> {
+  return decodeArrayBufferTo48k(await file.arrayBuffer());
 }
 
 export function meanDelta(
