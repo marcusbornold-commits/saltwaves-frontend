@@ -9,6 +9,7 @@ import {
   type AccessLevel,
 } from "@/lib/access-limits";
 import { uploadAudio, type MicType } from "@/lib/upload-client";
+import { BACKEND_DOWN_MESSAGE, useBackendHealth } from "@/lib/backend-health";
 
 /* ---------- Brand wordmark ---------- */
 export function Wordmark({ dark, href = "/" }: { dark?: boolean; href?: string }) {
@@ -213,6 +214,8 @@ export function UploadZone({
   const [email, setEmail] = useState("");
   const inputRef = useRef<any>(null);
   const [uploadBytes, setUploadBytes] = useState<{ loaded: number; total: number } | null>(null);
+  const { health: backendHealth, recheck: recheckBackend } = useBackendHealth();
+  const backendDown = backendHealth === "down";
 
   const rejectForLimit = (f: any, message: string) => {
     setFile(f);
@@ -271,6 +274,12 @@ export function UploadZone({
 
     if (!isValidEmail(email)) {
       setError("Enter a valid email so we can send your mastered file.");
+      return;
+    }
+
+    // Fresh check right before sending — the mount-time ping may be stale.
+    if ((await recheckBackend()) === "down") {
+      setError(BACKEND_DOWN_MESSAGE);
       return;
     }
 
@@ -340,6 +349,7 @@ export function UploadZone({
           </div>
           <div className="upload-title">{dragging ? "Drop it — let's listen." : "Drop your episode here"}</div>
           <div className="microcopy">.wav, .mp3, or .m4a — or click to browse</div>
+          {backendDown && <UploadErrorMessage message={BACKEND_DOWN_MESSAGE} />}
           {error && <UploadErrorMessage message={error} />}
         </div>
       )}
@@ -361,6 +371,7 @@ export function UploadZone({
 
           {(status === "ready" || status === "limit-error") && (
             <>
+              {backendDown && !error && <UploadErrorMessage message={BACKEND_DOWN_MESSAGE} />}
               {error && <UploadErrorMessage message={error} />}
               <input
                 type="email"
@@ -388,13 +399,13 @@ export function UploadZone({
                 style={{
                   width: "100%",
                   justifyContent: "center",
-                  opacity: !file || hasLimitError ? 0.5 : 1,
-                  cursor: !file || hasLimitError ? "not-allowed" : "pointer",
+                  opacity: !file || hasLimitError || backendDown ? 0.5 : 1,
+                  cursor: !file || hasLimitError || backendDown ? "not-allowed" : "pointer",
                 }}
                 onClick={startMastering}
-                disabled={!file || hasLimitError}
+                disabled={!file || hasLimitError || backendDown}
               >
-                Start mastering
+                {backendDown ? "Mastering offline" : "Start mastering"}
               </button>
               <div className="microcopy" style={{ marginTop: 8, textAlign: "center" }}>
                 We email your file and delete it after. No account, no storage.
