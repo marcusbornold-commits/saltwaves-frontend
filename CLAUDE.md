@@ -21,7 +21,7 @@ Env vars live in `.env.local` (gitignored); `.env.example` lists every key. Miss
 
 This repo is the Vercel project **saltwaves-services** (`.vercel/project.json`). The git remote is `saltwaves-frontend` on GitHub — pushing there does **not** deploy anything.
 
-- Deploy only manually, with `vercel --prod`. There is no Git autodeploy on this project.
+- Git autodeploy is ON: every push to `main` deploys to production. `vercel --prod` is not needed.
 - Committing straight to `main` is fine here, precisely because deploys are manual — a commit, and even a push, reaches nobody until someone runs `vercel --prod`. No feature branch needed for ordinary work.
 - `saltwaves-site` is a **separate** repo that *does* have Git autodeploy — a push to `main` there goes straight to production. The rule above does not apply to it.
 - Never use `git add -A`. Stage files by explicit name.
