@@ -19,15 +19,15 @@ Env vars live in `.env.local` (gitignored); `.env.example` lists every key. Miss
 
 ## Deploy rules
 
-This repo is the Vercel project **saltwaves-services** (`.vercel/project.json`). The git remote is `saltwaves-frontend` on GitHub — pushing there does **not** deploy anything.
+This repo is Vercel project **saltwaves-services** (`.vercel/project.json`), GitHub repo **saltwaves-frontend**, production domain **app.saltwaves.studio**. Verified against Vercel configuration and the live deployment on 2026-09-08.
 
-- Git autodeploy is ON: every push to `main` deploys to production. `vercel --prod` is not needed.
-- Committing straight to `main` is fine here, precisely because deploys are manual — a commit, and even a push, reaches nobody until someone runs `vercel --prod`. No feature branch needed for ordinary work.
-- `saltwaves-site` is a **separate** repo that *does* have Git autodeploy — a push to `main` there goes straight to production. The rule above does not apply to it.
+- Git autodeploy is ON from `main`. A push to `main` publishes to production; `vercel --prod` is not required for that flow.
+- Use a separate branch for work that must be reviewed before publication. A local commit alone does not deploy.
+- `saltwaves-site` and `salwaves-bots` are separate projects and ALSO autodeploy from `main`.
 - Never use `git add -A`. Stage files by explicit name.
 - Run `git log --oneline -5` and `git status --short` before every commit.
-- `NEXT_PUBLIC_*` variables must exist in Vercel *before* the build, and must **not** be marked Sensitive (they are inlined at build time; Sensitive makes them unreadable to the build).
-- After deploying, verify the deployed commit hash in the Vercel dashboard before assuming anything is live.
+- `NEXT_PUBLIC_*` values must be configured before the build; they are public and inlined into browser code. Never put secrets in them.
+- After an authorized deploy, verify the production domain's deployed commit before assuming the change is live.
 
 ## Limits on autonomous changes
 
@@ -35,8 +35,8 @@ Never change these on your own. Flag them with an explanation and a proposal, an
 
 - Anything Stripe: products, prices, webhooks, the checkout flow.
 - `scripts/retention_sweep.sh` and all GDPR deletion logic. The 48-hour window is deliberate positioning, not a bug to "fix". (Lives in the backend repo — `scripts/` is empty here.)
-- Auth: NextAuth and Supabase auth tokens. Authenticated upload returning 403 is a **known** JWE-vs-Supabase-token mismatch — do not "fix" it without discussion.
-- The audio pipeline's order and parameters (DFN → highpass → EQ → gate → compressors → de-esser → limiter → loudnorm) and the loudnorm targets (I = −19 mono / −16 stereo, TP = −1.0, LRA = 50). Backend repo; treat any value mirrored in UI copy here as read-only.
+- Auth: Auth.js, Supabase and upload tokens. The current implementation mints HS256 upload tokens using `UPLOAD_TOKEN_SECRET`; do not assume a 403 is the historical JWE mismatch. Full authenticated upload has not yet been verified end to end.
+- The audio pipeline's order and parameters and the loudnorm targets (I = −19 mono / −16 stereo, TP = −1.0, LRA = 50). Backend repo; treat any value mirrored in UI copy here as read-only. MacBook has a pending limiter-after-loudnorm change in `apply_final_loudnorm`; do not assume the local and production chains are identical.
 - Pricing, the Founding cap (20 spots), and anything on `/founding` that is a business term.
 
 For everything else — code quality, bugs, dead features, inconsistencies with the conventions below, missing error handling — find *and* propose the fix in the same step, but show a plan or diff before committing anything.
@@ -92,11 +92,11 @@ Client-side, `lib/checkout-client.ts` posts to the checkout route and redirects 
 
 The Next.js app is a frontend to a separate FastAPI service (`NEXT_PUBLIC_API_URL` / `API_URL`):
 
-- `app/api/upload/route.ts` proxies multipart uploads server-side, forwarding the raw Auth.js JWT as a `Bearer` header so the backend can identify the user.
-- `lib/upload-client.ts` is the browser path: it fetches a raw JWT from `/api/upload-token`, then uploads **directly** to the FastAPI service. Both paths validate the `.wav|.mp3|.m4a` extension and return structured `error_code` + human `message` pairs — keep the two in sync when changing accepted formats or error copy.
+- `app/api/upload/route.ts` proxies multipart uploads server-side, forwarding a signed upload token as a `Bearer` header so the backend can identify the user.
+- `lib/upload-client.ts` is the browser path: it fetches a signed upload token from `/api/upload-token`, then uploads **directly** to the FastAPI service. Both paths validate the `.wav|.mp3|.m4a` extension and return structured `error_code` + human `message` pairs — keep the two in sync when changing accepted formats or error copy.
 - `lib/audio-analysis.ts` decodes audio to 48k in the browser and computes ITU-R BS.1770-4 loudness, true peak, and LTAS. It is shared by `/tools/ab-analyzer` and `/tools/local-run`.
 
-`app/tools/local-run/` is a laptop-only panel that talks to a Python runner at `http://127.0.0.1:8766` over an SSH tunnel — see `LOCAL-RUN.md` (Swedish) for the startup sequence. `EXPECTED_RUNNER_VERSION` in `LocalRunPanel.tsx` must be bumped whenever `runner.py` bumps its version, or the panel reports a mismatch.
+`app/tools/local-run/` is an internal panel that talks to a Python runner at `http://127.0.0.1:8766`, either on MacBook itself or over an SSH tunnel to Mac Mini — see `LOCAL-RUN.md` (Swedish) for the startup sequence. `EXPECTED_RUNNER_VERSION` in `LocalRunPanel.tsx` must be bumped whenever `runner.py` bumps its version, or the panel reports a mismatch.
 
 ### Styling
 
