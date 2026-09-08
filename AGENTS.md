@@ -16,3 +16,8 @@ Verifierat 2026-09-08. Läs `CLAUDE.md` för arkitektur och skyddade ändringsom
 - Relevant kodverifiering: `npm run build`; kör riktad kontroll efter ändringar. Lokala beroenden saknades vid överlämningen; en lyckad produktionsbuild är inte ett lokalt test.
 - HS256-uppladdningstoken används redan. Ett påstått äldre JWE-problem är ingen verifierad aktuell felorsak.
 - Local Run kan köras helt på MacBook eller via tunnel till Mac Mini. Båda använder lokalt 8766 och får inte startas samtidigt.
+
+## Supabase queue
+- Read `CLOUD-QUEUE.md` for the cloud upload route, worker/cron requirements and rollback.
+- Preserve cloud download routes during rollback until all cloud jobs and links expire.
+- The upload health check reports acceptance availability, not worker availability.

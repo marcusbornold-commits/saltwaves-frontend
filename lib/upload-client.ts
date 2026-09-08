@@ -101,6 +101,14 @@ export async function uploadAudio(
     );
   }
 
+  const queueHealth = await fetch('/api/queue/health', {cache: 'no-store'});
+  if (!queueHealth.ok) throw new UploadError('Upload is temporarily unavailable. Please try again shortly.', 'service_unavailable');
+  const queueConfig = await queueHealth.json();
+  if (queueConfig.backend === 'supabase') {
+    const { cloudUpload } = await import('./cloud-upload');
+    return cloudUpload(file, micType, email, durationSeconds, loudnessInspectorAttribution(), onProgress);
+  }
+
   // Ahead of the limit checks, so a signed-in caller is measured against their
   // own tier. A 401 (or any other failure) means anonymous — same upload as
   // before, same free limits.

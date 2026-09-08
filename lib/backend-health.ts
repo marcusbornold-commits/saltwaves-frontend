@@ -8,19 +8,25 @@ const HEALTH_TIMEOUT_MS = 4000;
 const RECHECK_INTERVAL_MS = 60_000;
 
 export const BACKEND_DOWN_MESSAGE =
-  "Mastering is offline right now. Nothing was uploaded — try again in a little while.";
+  "Uploads are temporarily unavailable. Nothing was uploaded — try again shortly.";
 
 /**
- * Pings FastAPI `/health` through the public Funnel URL.
+ * Checks the active upload destination. Supabase uploads remain available while
+ * the audio worker is offline; legacy uploads still require FastAPI health.
  * Resolves "down" on any network failure, non-2xx, or timeout. Never throws.
  */
 export async function checkBackendHealth(): Promise<BackendHealth> {
   const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-  if (!apiBase) return "down";
+
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
   try {
+    const configResponse = await fetch('/api/queue/health', {cache: 'no-store', signal: controller.signal});
+    if (!configResponse.ok) return 'down';
+    const config = await configResponse.json();
+    if (config.backend === 'supabase') return config.ok ? 'up' : 'down';
+    if (!apiBase) return 'down';
     const res = await fetch(`${apiBase}/health`, {
       method: "GET",
       cache: "no-store",
