@@ -1,17 +1,11 @@
-# Customer uploads through Supabase
+# B2C queue selection
 
-Set `PODMASTER_QUEUE_BACKEND=supabase` to enable the new upload path. The default is `legacy` for controlled rollout/rollback. The matching backend, SQL migration and operational instructions are in the PodMaster repository's `CLOUD-QUEUE.md`.
+Marcus confirmed that only the B2C queue moves to Supabase. All audio files, processing and downloads remain on the always-on Mac Mini. B2B and Local Run keep their current paths.
 
-The browser obtains a job-scoped signed upload token from `POST /api/jobs`, then uploads directly to private Supabase Storage using 6 MiB TUS chunks and the `/storage/v1/upload/resumable/sign` endpoint. Audio never passes through a Vercel function. `POST /api/jobs/:id/complete` verifies actual Storage size and atomically queues the job. It is safe to retry completion.
+`PODMASTER_QUEUE_BACKEND=supabase` selects the Mini's `/upload-b2c` endpoint for customer uploads. Default `legacy` selects existing `/upload`. The browser still sends multipart audio directly to the Mini with the existing upload token. No audio is sent through Vercel functions or to Supabase Storage. No TUS client or Vercel storage-cleanup cron is used.
 
-The existing Auth.js session and Supabase subscription lookup determine plan entitlements on the server. Queue table access stays service-only. The job capability returned to the caller permits only that job's status, completion and download; it never permits listing other users' jobs. Do not log capability URLs or expose service credentials to clients.
+`GET /api/queue/health` reports the selected queue and, in Supabase mode, verifies access to its table. The existing Mini health check stays in place. Server-side plan validation and queue registration run on the Mini.
 
-`GET /api/jobs/:id` reports status. `GET /api/jobs/:id/file` requires the capability, checks logical expiry, validates the requested output path and redirects to a private Storage URL lasting no more than 60 seconds. These routes must remain deployed while cloud jobs or download links exist, including during a switch back to legacy uploads.
+Deploy the matching PodMaster backend migrations, route and separate B2C worker before setting the flag. See that repository's `CLOUD-QUEUE.md` for worker setup, retry, retention and rollback. A rollback sets the flag to `legacy` and redeploys this frontend; keep the Mini's B2C worker and download endpoints until queued jobs and links have expired.
 
-`GET /api/queue/health` checks the active upload destination. In cloud mode it does not require a running Mac Mini, so upload controls stay available during worker downtime. The Mac Mini still performs the audio processing.
-
-`/api/internal/queue-maintenance` requires `Authorization: Bearer <CRON_SECRET>` and runs every 15 minutes on Vercel Pro. It expires abandoned upload grants after two hours, queued jobs after 48 hours, and successful jobs 48 hours after completion. It deletes only each expired job's private Storage prefixes and clears personal metadata. Keep the cron secret on the server. Monitor failed maintenance requests; an unavailable cleanup service delays physical deletion but not logical link expiry.
-
-Required server settings: existing `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_TOKEN_SECRET`, plus `PODMASTER_QUEUE_BACKEND` and `CRON_SECRET`. Private input buckets enforce existing Free/paid size ceilings independently of the larger result bucket. Never make buckets public to fix an upload error.
-
-Validation: `npm run test:queue`, `npm run build`, followed by a synthetic TUS/upload/queue/worker/download/expiry test. Do not send test email to customers or use customer audio for deployment checks.
+Validation: `npm run build`, then an actual synthetic multipart upload through the selected production endpoint, Supabase claim, local audio processing and protected Mini download. B2B and Local Run routes must not change.

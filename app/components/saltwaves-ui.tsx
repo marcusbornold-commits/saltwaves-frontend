@@ -405,7 +405,7 @@ export function UploadZone({
                 onClick={startMastering}
                 disabled={!file || hasLimitError || backendDown}
               >
-                {backendDown ? "Uploads unavailable" : "Start mastering"}
+                {backendDown ? "Mastering offline" : "Start mastering"}
               </button>
               <div className="microcopy" style={{ marginTop: 8, textAlign: "center" }}>
                 We email your file and delete it after. No account, no storage.
@@ -419,7 +419,7 @@ export function UploadZone({
             if (done) {
               return (
                 <div className="microcopy" style={{ padding: "14px 0 4px" }}>
-                  Finishing your upload…
+                  Listening… measuring noise floor &amp; loudness
                 </div>
               );
             }

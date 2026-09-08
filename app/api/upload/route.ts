@@ -1,4 +1,3 @@
-import { cloudEnabled } from "@/lib/cloud-queue";
 import { auth } from "@/auth";
 import { getAccess } from "@/lib/access";
 import {
@@ -29,7 +28,6 @@ function parseMicType(value: FormDataEntryValue | null): MicType {
 }
 
 export async function POST(request: Request) {
-  if (cloudEnabled()) return NextResponse.json({error_code: "direct_upload_required", message: "Please upload through the PodMaster website."}, {status: 409});
   const session = await auth();
 
   let formData: FormData;

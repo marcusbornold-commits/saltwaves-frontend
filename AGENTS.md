@@ -17,7 +17,6 @@ Verifierat 2026-09-08. Läs `CLAUDE.md` för arkitektur och skyddade ändringsom
 - HS256-uppladdningstoken används redan. Ett påstått äldre JWE-problem är ingen verifierad aktuell felorsak.
 - Local Run kan köras helt på MacBook eller via tunnel till Mac Mini. Båda använder lokalt 8766 och får inte startas samtidigt.
 
-## Supabase queue
-- Read `CLOUD-QUEUE.md` for the cloud upload route, worker/cron requirements and rollback.
-- Preserve cloud download routes during rollback until all cloud jobs and links expire.
-- The upload health check reports acceptance availability, not worker availability.
+## Supabase B2C queue
+- Read `CLOUD-QUEUE.md`. Only B2C job metadata is queued in Supabase; audio stays on Mac Mini.
+- B2B and Local Run keep their current paths. Keep the Mac Mini health check.
