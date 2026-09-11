@@ -93,12 +93,21 @@ export async function uploadAudio(
   access: AccessLevel = FREE_ACCESS,
   durationSeconds: number | null = null,
   onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<UploadResult> {
   if (!/\.(wav|mp3|m4a)$/i.test(file.name)) {
     throw new UploadError(
       "This doesn't look like an audio file we can read. We support WAV, MP3, and M4A.",
       "invalid_file_type",
     );
+  }
+
+  const queueHealth = await fetch('/api/queue/health', {cache: 'no-store',signal});
+  if (!queueHealth.ok) throw new UploadError('The queue is temporarily unavailable. Please try again shortly.', 'service_unavailable');
+  const queueConfig = await queueHealth.json();
+  if(queueConfig.transport==='storage') {
+    const { uploadPaidAudio }=await import('./paid-upload-client');
+    return uploadPaidAudio(file,micType,email,durationSeconds,queueConfig.uploadScope,onProgress,signal);
   }
 
   // Ahead of the limit checks, so a signed-in caller is measured against their
@@ -148,9 +157,6 @@ export async function uploadAudio(
     );
   }
 
-  const queueHealth = await fetch('/api/queue/health', {cache: 'no-store'});
-  if (!queueHealth.ok) throw new UploadError('The queue is temporarily unavailable. Please try again shortly.', 'service_unavailable');
-  const queueConfig = await queueHealth.json();
   const uploadPath = queueConfig.backend === 'supabase' ? '/upload-b2c' : '/upload';
 
   const params = new URLSearchParams({ mode: "standard", mic_type: micType });
@@ -172,6 +178,10 @@ export async function uploadAudio(
 
   return new Promise<UploadResult>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const abort=()=>xhr.abort();
+    signal?.addEventListener('abort',abort,{once:true});
+    xhr.onloadend=()=>signal?.removeEventListener('abort',abort);
+    xhr.onabort=()=>reject(new DOMException('Upload cancelled','AbortError'));
     xhr.open("POST", `${apiBase}${uploadPath}?${params.toString()}`);
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
@@ -219,6 +229,7 @@ export async function uploadAudio(
       );
     };
 
+    if(signal?.aborted) {signal.removeEventListener('abort',abort);reject(new DOMException('Upload cancelled','AbortError'));return;}
     xhr.send(form);
   });
 }

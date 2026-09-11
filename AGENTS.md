@@ -18,5 +18,5 @@ Verifierat 2026-09-08. Läs `CLAUDE.md` för arkitektur och skyddade ändringsom
 - Local Run kan köras helt på MacBook eller via tunnel till Mac Mini. Båda använder lokalt 8766 och får inte startas samtidigt.
 
 ## Supabase B2C queue
-- Read `CLOUD-QUEUE.md`. Only B2C job metadata is queued in Supabase; audio stays on Mac Mini.
-- B2B and Local Run keep their current paths. Keep the Mac Mini health check.
+- Read `CLOUD-QUEUE.md`. Marcus approved direct private Storage uploads for Creator, Studio and Founding on 2026-09-11. Free inputs and all results remain on Mini.
+- B2B and Local Run keep their current paths. Paid cloud uploads depend on the queue, not Mini availability; local uploads retain the Mini health check.
