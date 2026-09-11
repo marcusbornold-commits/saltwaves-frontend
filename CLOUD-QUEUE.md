@@ -1,5 +1,11 @@
 # B2C queue selection
 
+## Branded downloads (2026-09-11)
+
+`/download/<job-uuid>?token=<existing-capability>&kind=mastered` is an external Vercel rewrite to the Mini's protected `/b2c/jobs/<id>/file` endpoint. It proxies audio without an HTTP redirect or a Next.js Function. Only the UUID-shaped download route is proxied. Caching is disabled; responses are marked no-referrer/noindex. The Mini still enforces the token and 48h expiry, including Range/HEAD requests.
+
+Deploy and verify this route before enabling `PODMASTER_DOWNLOAD_BASE_URL=https://app.saltwaves.studio/download` on the Mini B2C worker. Unset that worker setting to revert future emails to the legacy URL. Keep both routes available for already-sent links. Storage and the paid upload flag are independent. Download traffic now also counts against Vercel transfer usage.
+
 ## Paid Storage input (approved 2026-09-11)
 
 This section replaces the queue-only input design below. `PODMASTER_QUEUE_BACKEND=supabase` still selects the shared queue. Independent `PODMASTER_PAID_UPLOADS=off|canary|on` controls only paid file transport (default off). Canary IDs are comma-separated in `PODMASTER_PAID_UPLOAD_TEST_USERS`.

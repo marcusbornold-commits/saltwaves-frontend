@@ -1,4 +1,23 @@
 {
   "framework": "nextjs",
-  "crons": [{"path":"/api/queue/cleanup","schedule":"*/15 * * * *"}]
+  "crons": [{"path":"/api/queue/cleanup","schedule":"*/15 * * * *"}],
+  "rewrites": [
+    {
+      "source": "/download/:id([0-9a-f-]{36})",
+      "destination": "https://mac-mini-som-tillhr-marcus.tailad5b1d.ts.net/b2c/jobs/:id/file"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/download/:path*",
+      "headers": [
+        {"key":"Cache-Control","value":"private, no-store"},
+        {"key":"CDN-Cache-Control","value":"no-store"},
+        {"key":"Vercel-CDN-Cache-Control","value":"no-store"},
+        {"key":"x-vercel-enable-rewrite-caching","value":"0"},
+        {"key":"Referrer-Policy","value":"no-referrer"},
+        {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive"}
+      ]
+    }
+  ]
 }
