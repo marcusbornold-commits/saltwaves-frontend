@@ -413,7 +413,7 @@ export function UploadZone({
                 {backendDown ? "Mastering offline" : "Start mastering"}
               </button>
               <div className="microcopy" style={{ marginTop: 8, textAlign: "center" }}>
-                We email your file and delete it after. No account, no storage.
+                We email your download link. Mastered files are available for 48 hours.
               </div>
             </>
           )}

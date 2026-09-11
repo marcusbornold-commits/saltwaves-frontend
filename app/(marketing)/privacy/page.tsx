@@ -11,7 +11,7 @@ export default function PrivacyPolicyPage() {
   return (
     <article className={styles.page}>
       <h1>Privacy Policy</h1>
-      <p className={styles.updated}>Last updated: 27 July 2026</p>
+      <p className={styles.updated}>Last updated: 11 September 2026</p>
 
       <h2>Controller</h2>
       <p>
@@ -28,8 +28,9 @@ export default function PrivacyPolicyPage() {
 
       <h2>Free tier</h2>
       <p>
-        Your email address is used solely to deliver your file. It is never
-        written to a database and no account is created.
+        You can upload without creating an account. Your email address and job
+        details are stored temporarily in our Supabase job queue to process and
+        deliver your file. Free audio uploads go directly to our own hardware.
       </p>
 
       <h2>Retention</h2>
@@ -40,8 +41,11 @@ export default function PrivacyPolicyPage() {
 
       <h2>Where processing happens</h2>
       <p>
-        On our own hardware within the EU. No audio is sent to third-party
-        APIs.
+        Audio processing runs on our own hardware within the EU. Creator,
+        Studio and Founding uploads use private Supabase Storage in Frankfurt
+        as temporary input storage before our hardware retrieves the file for
+        processing. Completed, cancelled and expired cloud inputs are removed
+        by automatic cleanup. Mastered files are served from our own hardware.
       </p>
 
       <h2>Paid accounts</h2>
