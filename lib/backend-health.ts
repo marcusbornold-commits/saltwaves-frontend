@@ -21,6 +21,10 @@ export async function checkBackendHealth(): Promise<BackendHealth> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
   try {
+    const queue=await fetch('/api/queue/health',{cache:'no-store',signal:controller.signal});
+    if(!queue.ok) return 'down';
+    const config=await queue.json();
+    if(config.transport==='storage') return 'up';
     const res = await fetch(`${apiBase}/health`, {
       method: "GET",
       cache: "no-store",

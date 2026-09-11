@@ -214,6 +214,7 @@ export function UploadZone({
   const [email, setEmail] = useState("");
   const inputRef = useRef<any>(null);
   const [uploadBytes, setUploadBytes] = useState<{ loaded: number; total: number } | null>(null);
+  const uploadController = useRef<AbortController | null>(null);
   const { health: backendHealth, recheck: recheckBackend } = useBackendHealth();
   const backendDown = backendHealth === "down";
 
@@ -225,6 +226,7 @@ export function UploadZone({
   };
 
   const accept = async (f: any) => {
+    if (status === 'working') return;
     if (!f) return;
     if (!/\.(wav|mp3|m4a)$/i.test(f.name)) {
       setError("This doesn't look like an audio file we can read. We support WAV, MP3, and M4A.");
@@ -286,6 +288,7 @@ export function UploadZone({
     setStatus("working");
     setError(null);
     setUploadBytes({ loaded: 0, total: file.size });
+    uploadController.current = new AbortController();
 
     try {
       await uploadAudio(
@@ -295,11 +298,12 @@ export function UploadZone({
         access,
         durationSeconds,
         (loaded, total) => setUploadBytes({ loaded, total }),
+        uploadController.current.signal,
       );
       setStatus("queued");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Upload failed — try again.",
+        err instanceof Error && err.name === 'AbortError' ? 'Upload cancelled. You can start again when ready.' : err instanceof Error ? err.message : "Upload failed — try again.",
       );
       setStatus("ready");
       setUploadBytes(null);
@@ -308,6 +312,7 @@ export function UploadZone({
 
   const reset = (e: any) => {
     e.stopPropagation();
+    if(status === 'working') {uploadController.current?.abort();return;}
     setFile(null);
     setStatus("idle");
     setError(null);
@@ -362,7 +367,7 @@ export function UploadZone({
               <div className="upload-file-name">{file.name}</div>
               <div className="microcopy">{formatBytes(file.size)}</div>
             </div>
-            <button className="btn btn-ghost btn-sm" onClick={reset} aria-label="Remove file" style={{ padding: "8px 12px" }}>✕</button>
+            <button className="btn btn-ghost btn-sm" onClick={reset} aria-label={status === 'working' ? 'Cancel upload' : 'Remove file'} style={{ padding: "8px 12px" }}>✕</button>
           </div>
 
           {status === "checking" && (
@@ -419,7 +424,7 @@ export function UploadZone({
             if (done) {
               return (
                 <div className="microcopy" style={{ padding: "14px 0 4px" }}>
-                  Listening… measuring noise floor &amp; loudness
+                  Upload received. Adding your episode to the queue…
                 </div>
               );
             }
