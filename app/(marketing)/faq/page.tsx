@@ -17,7 +17,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "How long are my files kept?",
-    a: "Every plan: your original upload is deleted right after processing. Mastered files stay available to download for 48 hours, then we remove them. Persistent library storage arrives with v2 — until then, download and keep your copy.",
+    a: "Every plan: your original upload is deleted after processing. Paid uploads use temporary private storage with automatic cleanup every 15 minutes. Mastered files stay available to download for 48 hours, then we remove them. Download and keep your copy.",
   },
   {
     q: "Refunds and cancellation",
