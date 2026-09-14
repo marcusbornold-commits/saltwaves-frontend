@@ -323,6 +323,8 @@ function buildDeliveryReportHtml(opts: {
   specLabel: string;
   rows: SpecEvalRow[];
   locale: ReportLocale;
+  methodology?: string;
+  measurementOnly?: boolean;
 }): string {
   const copy = REPORT_COPY[opts.locale];
   const statusLabel =
@@ -341,7 +343,7 @@ function buildDeliveryReportHtml(opts: {
       const resultText = row.outcome ?? statusLabel(row.status);
       return `<tr>
   <td>${escapeHtml(row.parameter)}</td>
-  <td>${escapeHtml(row.before)}</td>
+  ${opts.measurementOnly ? "" : `<td>${escapeHtml(row.before)}</td>`}
   <td>${escapeHtml(row.after)}</td>
   <td>${escapeHtml(row.requirement)}</td>
   <td class="status ${cls}">${escapeHtml(resultText)}</td>
@@ -403,8 +405,8 @@ function buildDeliveryReportHtml(opts: {
     <thead>
       <tr>
         <th>${escapeHtml(copy.parameter)}</th>
-        <th>${escapeHtml(copy.before)}</th>
-        <th>${escapeHtml(copy.after)}</th>
+        ${opts.measurementOnly ? "" : `<th>${escapeHtml(copy.before)}</th>`}
+        <th>${escapeHtml(opts.measurementOnly ? (opts.locale === "sv" ? "Uppmätt" : "Measured") : copy.after)}</th>
         <th>${escapeHtml(copy.requirement)}</th>
         <th>${escapeHtml(copy.result)}</th>
       </tr>
@@ -414,7 +416,7 @@ ${rowHtml}
     </tbody>
   </table>
   <p class="note">${escapeHtml(copy.note)}</p>
-  <p class="method">${escapeHtml(copy.methodology)}</p>
+  <p class="method">${escapeHtml(opts.methodology ?? copy.methodology)}</p>
   <footer>
     Saltwaves Studio · Marcus Bornold · ${escapeHtml(copy.location)} ·
     <a href="mailto:hello@saltwaves.studio">hello@saltwaves.studio</a><br />
@@ -1548,3 +1550,6 @@ const LOCAL_RUN_CSS = `
   .lr-spec-label{grid-column:1/-1}
 }
 `;
+
+// Shared with Audiobook: identical measurements and report layout.
+export { analyzeWithNoiseFloor, evaluateSpecRows, buildDeliveryReportHtml, deliveryReportBasename, downloadBlob };
