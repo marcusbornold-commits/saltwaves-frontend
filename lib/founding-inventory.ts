@@ -75,12 +75,15 @@ export async function createFoundingCheckout(ownerId: string, customerId: string
   return session.url;
 }
 
-export async function foundingInventoryCount(): Promise<number> {
+export async function foundingInventoryStatus(): Promise<{ sold: number; available: number }> {
   const db = getSupabaseAdmin();
   const { data: config, error: configError } = await db.from("founding_inventory").select("initialized").single();
   if (configError || !config?.initialized) throw new FoundingUnavailable("unavailable");
   await reconcileFoundingSlots();
-  const { count, error } = await db.from("founding_slots").select("slot", { count: "exact", head: true }).eq("state", "sold");
-  if (error) throw new FoundingUnavailable("unavailable");
-  return count ?? 0;
+  const { data, error } = await db.from("founding_slots").select("state");
+  if (error || data?.length !== 20) throw new FoundingUnavailable("unavailable");
+  return {
+    sold: data.filter(slot => slot.state === "sold").length,
+    available: data.filter(slot => slot.state === "available").length,
+  };
 }

@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { getFoundingCount, getFoundingTierInfo } from "@/lib/founding";
+import { getFoundingStatus, getFoundingTierInfo } from "@/lib/founding";
 import type { Metadata } from "next";
 import FoundingCheckoutButton from "./founding-checkout-button";
 import "./founding.css";
@@ -28,14 +28,15 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
   const session = await auth();
   const { checkout } = await searchParams;
   let sold: number;
-  try { sold = await getFoundingCount(); } catch {
+  let available: number;
+  try { ({ sold, available } = await getFoundingStatus()); } catch {
     return <main className="founding-page"><div className="founding-shell">
       <h1 className="founding-title">Founding</h1>
       <p>20 places total, $129 once for lifetime Creator access. Checkout is temporarily unavailable while availability is verified.</p>
       <a href="/pricing">View monthly and annual plans</a>
     </div></main>;
   }
-  const tierInfo = getFoundingTierInfo(sold);
+  const tierInfo = getFoundingTierInfo(sold, available);
 
   return (
     <main className="founding-page">
@@ -52,7 +53,7 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
 
         <article className={`founding-card${tierInfo.soldOut ? " sold-out" : ""}`}>
           <p className="founding-counter">
-            {tierInfo.sold} / {tierInfo.total} claimed
+            {available} places available · {tierInfo.sold} / {tierInfo.total} claimed
           </p>
 
           <ul className="founding-features">
@@ -63,6 +64,8 @@ export default async function FoundingPage({ searchParams }: FoundingPageProps) 
 
           {tierInfo.soldOut ? (
             <p className="founding-sold-out-msg">All 20 spots claimed</p>
+          ) : available === 0 ? (
+            <p className="founding-sold-out-msg">All remaining places are temporarily reserved. Please check back later.</p>
           ) : (
             <FoundingCheckoutButton
               tier={tierInfo.tier}
