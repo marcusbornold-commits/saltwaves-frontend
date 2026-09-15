@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getAudiobookStorage, audiobookStorageUrl } from '@/lib/audiobook-storage-admin';
-import { healthIssues, type MiniHealth } from '@/lib/audiobook-monitor-checks';
+import { healthIssues, checkMiniService, miniServiceIssue, type MiniHealth } from '@/lib/audiobook-monitor-checks';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -21,12 +21,18 @@ export async function GET(request:Request) {
   const db=getAudiobookStorage();
   const issues:string[]=[];
   const checks=await Promise.allSettled([
-    fetch((process.env.AUDIOBOOK_SERVICE_URL || '').replace(/\/$/,'')+'/health',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async r=>{if(!r.ok || !(await r.json()).ok) throw new Error();}),
+    checkMiniService((process.env.AUDIOBOOK_SERVICE_URL || '').replace(/\/$/,'')+'/health'),
     fetch('https://app.saltwaves.studio/login?callbackUrl=%2Ftools%2Faudiobook',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async r=>{if(!r.ok || !(await r.text()).includes('Sign in')) throw new Error();}),
     db.from('audiobook_monitor_health').select('checked_at,data').eq('id','mini').abortSignal(AbortSignal.timeout(10000)).maybeSingle().then(r=>{if(r.error) throw r.error;return r.data;}),
     db.storage.getBucket('audiobook-private').then(r=>{if(r.error || !r.data || r.data.public) throw new Error();})
   ]);
-  if(checks[0].status==='rejected') issues.push('Mastringstjänsten på Mac Mini svarar inte normalt.');
+  const service = checks[0].status === 'fulfilled' ? checks[0].value : { ok: false, attempts: [] };
+  const mini = checks[2].status === 'fulfilled' ? checks[2].value : null;
+  const serviceIssue = miniServiceIssue(service.ok, mini?.data as MiniHealth | null, mini?.checked_at || null);
+  if (serviceIssue) issues.push(serviceIssue);
+  // Persist safe probe details in the hosting logs, including recovered first attempts.
+  console.info('audiobook_monitor_probe', JSON.stringify({ checkedAt: new Date().toISOString(), service,
+    miniCheckedAt: mini?.checked_at || null, workerAgeSeconds: mini?.data?.workerAgeSeconds ?? null, serviceIssue }));
   if(checks[1].status==='rejected') issues.push('Webbplatsens inloggningssida svarar inte normalt.');
   if(checks[3].status==='rejected') issues.push('Den privata ljudlagringen kan inte verifieras.');
   if(checks[2].status==='fulfilled') issues.push(...healthIssues(checks[2].value?.data as MiniHealth|null,checks[2].value?.checked_at || null));
