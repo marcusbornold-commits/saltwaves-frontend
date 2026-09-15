@@ -41,6 +41,8 @@ function Wave({item,current,title,onSeek,selection}:{item:Overview|null;current:
   </div></div>;
 }
 export default function AudiobookStudio(){
+  const [serviceMessage,setServiceMessage]=useState<string|null>(null);
+  useEffect(()=>{let stopped=false;async function check(){try{const r=await fetch('/api/audiobook/service-status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(r.ok){const status=await r.json();if(!stopped)setServiceMessage(status.message || null);}}catch{/* Job-specific retries and errors remain visible. */}}void check();const timer=setInterval(()=>void check(),60000);return()=>{stopped=true;clearInterval(timer);};},[]);
   const [file,setFile]=useState<File|null>(null),[source,setSource]=useState<Track|null>(null),[overview,setOverview]=useState<Overview|null>(null);
   const [downloadStem,setDownloadStem]=useState("");
   const [name,setName]=useState(""),[target,setTarget]=useState(-18),[job,setJob]=useState<Job|null>(null),[sourceId,setSourceId]=useState<string|null>(null);
@@ -97,6 +99,7 @@ export default function AudiobookStudio(){
   return <main className="ab-studio" lang="sv">
     <header className="ab-header"><Wordmark href="/tools/audiobook" /><span className="ab-badge">EARSELECT · AUDIOBOOK</span></header>
     <div className="ab-heading"><div><p className="ab-eyebrow">PROVLYSSNA · KONTROLLERA · MASTRA</p><h1>Audiobook<span>.</span></h1></div><p>Lyssna på originalet, välj ljudnivå och jämför resultatet. Du kan börja med ett utdrag eller mastra hela boken direkt.</p></div>
+    {serviceMessage&&<p role="status" className="ab-info">{serviceMessage}</p>}
     <ol className="ab-steps" aria-label="Så fungerar det"><li><span>1</span><div><strong>Ladda upp och lyssna</strong><p>Välj din fil och lyssna på originalet.</p></div></li><li><span>2</span><div><strong>Välj nivå och mastra</strong><p>Bearbeta ett utdrag eller hela boken.</p></div></li><li><span>3</span><div><strong>Jämför och ladda ner</strong><p>Växla mellan före och efter när mastern är klar.</p></div></li></ol>
     <section className="ab-workspace" aria-label="Ljudbok och provfönster"><div className="ab-filebar"><div><span className="ab-eyebrow">01 · LADDA UPP OCH LYSSNA</span><h2>{name||"Välj din ljudbok"}</h2></div><button className="ab-secondary" disabled={busy} onClick={()=>input.current?.click()}>{name?"Byt fil":"Välj ljudfil"}</button></div>
       <input ref={input} hidden type="file" accept=".wav,.mp3,.m4a,.aiff" onChange={e=>{if(e.target.files?.[0])void choose(e.target.files[0]);e.target.value="";}}/>

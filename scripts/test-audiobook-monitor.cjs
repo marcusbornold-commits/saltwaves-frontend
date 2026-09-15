@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const ts=require('typescript'),fs=require('node:fs'),vm=require('node:vm');
+const code=ts.transpile(fs.readFileSync('lib/audiobook-monitor-checks.ts','utf8'),{module:ts.ModuleKind.CommonJS});
+const moduleStub={exports:{}};vm.runInNewContext(code,{exports:moduleStub.exports});
+const {healthIssues}=moduleStub.exports;
+const now=Date.now(),at=new Date(now).toISOString();
+const good={workerAgeSeconds:3,diskFreeBytes:10*1024**3,cleanupAgeSeconds:30,cleanupFailed:false,queued:0,running:0,oldestQueuedAgeSeconds:0,recentErrors:0};
+assert.equal(healthIssues(good,at,now).length,0);
+assert.equal(healthIssues(null,null,now).length,1);
+assert.equal(healthIssues(good,new Date(now-301000).toISOString(),now).length,1);
+assert.equal(healthIssues({...good,running:1,queued:5,oldestQueuedAgeSeconds:7200},at,now).length,0,'Long running book must not be treated as stuck');
+assert.equal(healthIssues({...good,queued:1,oldestQueuedAgeSeconds:601},at,now).length,1);
+assert.equal(healthIssues({...good,workerAgeSeconds:70,diskFreeBytes:1024,cleanupFailed:true,recentErrors:3},at,now).length,4);
+console.log('6 monitor scenarios passed');
