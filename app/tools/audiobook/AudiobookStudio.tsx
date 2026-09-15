@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { Wordmark } from "../../components/saltwaves-ui";
 import { audiobookFetch, audiobookCloud, uploadAudiobook, reuseAudiobook, type Operation } from "@/lib/audiobook-client";
 import { wavOverview, type Overview } from "@/lib/audiobook-wave";
 import { defaultMasterStem, masterFilename } from "@/lib/audiobook-filename";
@@ -94,7 +95,7 @@ export default function AudiobookStudio(){
     }catch{setError("Rapporten kunde inte skapas. Försök igen.");}finally{setReportBusy(false);}}
   const failed=rows.filter(row=>row.status==="fail"),canRun=!!file||!!sourceId;
   return <main className="ab-studio" lang="sv">
-    <header className="ab-header"><a href="/tools/audiobook" className="ab-brand">saltwaves<span>®</span></a><span className="ab-badge">EARSELECT · AUDIOBOOK</span></header>
+    <header className="ab-header"><Wordmark href="/tools/audiobook" /><span className="ab-badge">EARSELECT · AUDIOBOOK</span></header>
     <div className="ab-heading"><div><p className="ab-eyebrow">PROVLYSSNA · KONTROLLERA · MASTRA</p><h1>Audiobook<span>.</span></h1></div><p>Lyssna på originalet, välj ljudnivå och jämför resultatet. Du kan börja med ett utdrag eller mastra hela boken direkt.</p></div>
     <ol className="ab-steps" aria-label="Så fungerar det"><li><span>1</span><div><strong>Ladda upp och lyssna</strong><p>Välj din fil och lyssna på originalet.</p></div></li><li><span>2</span><div><strong>Välj nivå och mastra</strong><p>Bearbeta ett utdrag eller hela boken.</p></div></li><li><span>3</span><div><strong>Jämför och ladda ner</strong><p>Växla mellan före och efter när mastern är klar.</p></div></li></ol>
     <section className="ab-workspace" aria-label="Ljudbok och provfönster"><div className="ab-filebar"><div><span className="ab-eyebrow">01 · LADDA UPP OCH LYSSNA</span><h2>{name||"Välj din ljudbok"}</h2></div><button className="ab-secondary" disabled={busy} onClick={()=>input.current?.click()}>{name?"Byt fil":"Välj ljudfil"}</button></div>
