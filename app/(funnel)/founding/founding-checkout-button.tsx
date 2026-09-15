@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { startCheckout } from "@/lib/checkout-client";
 
-type FoundingTier = "t1" | "t2" | "sold_out";
+type FoundingTier = "t1" | "sold_out";
 
 type FoundingCheckoutButtonProps = {
   tier: FoundingTier;
@@ -23,6 +23,7 @@ export default function FoundingCheckoutButton({
   soldOut,
 }: FoundingCheckoutButtonProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   if (soldOut) {
     return <p className="founding-sold-out-msg">All 20 spots claimed</p>;
@@ -35,10 +36,12 @@ export default function FoundingCheckoutButton({
       return;
     }
 
+    setError("");
     setLoading(true);
     try {
       await startCheckout(priceId);
-    } catch {
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Checkout is unavailable. Please try again.");
       setLoading(false);
     }
   }
@@ -58,6 +61,7 @@ export default function FoundingCheckoutButton({
       >
         {loading ? "Redirecting…" : `Get Founding — ${priceDisplay}`}
       </button>
+      {error && <p role="alert">{error}</p>}
     </>
   );
 }
