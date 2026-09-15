@@ -14,7 +14,8 @@ export async function startCheckout(priceId: string): Promise<void> {
   }
 
   if (!response.ok) {
-    throw new Error("Checkout failed");
+    const data = await response.json().catch(() => ({}));
+    throw new Error(typeof data.error === "string" ? data.error : "Checkout failed. Please try again.");
   }
 
   const data: { url?: string } = await response.json();

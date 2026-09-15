@@ -16,7 +16,6 @@ export function getAllowedPriceIds(): Set<string> {
       process.env.STRIPE_PRICE_STUDIO_MONTHLY,
       process.env.STRIPE_PRICE_STUDIO_YEARLY,
       process.env.STRIPE_PRICE_FOUNDING_T1,
-      process.env.STRIPE_PRICE_FOUNDING_T2,
     ].filter((id): id is string => Boolean(id))
   );
 }

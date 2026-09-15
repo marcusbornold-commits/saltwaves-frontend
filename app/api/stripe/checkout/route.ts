@@ -1,3 +1,4 @@
+import { createFoundingCheckout, FoundingUnavailable } from "@/lib/founding-inventory";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getStripe } from "@/lib/stripe";
@@ -68,6 +69,21 @@ export async function POST(request: Request) {
     if (updateError) {
       console.error("Failed to save stripe customer id:", updateError.message);
       return NextResponse.json({ error: "Failed to start checkout" }, { status: 500 });
+    }
+  }
+
+  if (founding) {
+    try {
+      const { data: member, error: memberError } = await supabaseAdmin.from("profiles")
+        .select("lifetime_creator").eq("id", session.user.id).maybeSingle();
+      if (memberError) throw new FoundingUnavailable("unavailable");
+      if (member?.lifetime_creator) throw new FoundingUnavailable("already_member");
+      return NextResponse.json({ url: await createFoundingCheckout(session.user.id, stripeCustomerId, priceId) });
+    } catch (error) {
+      const code = error instanceof FoundingUnavailable ? error.code : "unavailable";
+      return NextResponse.json({ error: code === "sold_out" ? "All places are sold or temporarily reserved. Please check back later." :
+        code === "already_member" ? "You already have Founding access." : "Founding checkout is temporarily unavailable. Please try again later." },
+        { status: code === "unavailable" ? 503 : 409 });
     }
   }
 
