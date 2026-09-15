@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   finally { accepting = false; }
 }
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" || process.env.AUDIOBOOK_REMOTE_DEV === "true") {
     try {
       const remote = await remoteAccess();
       const id = req.nextUrl.searchParams.get("id") || "";
