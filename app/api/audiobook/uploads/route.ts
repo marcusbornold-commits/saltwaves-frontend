@@ -1,9 +1,11 @@
+import { assertAudiobookCapacity } from '@/lib/audiobook-capacity';
 import { remoteAccess, remoteError, bucket, privateHeaders } from '@/lib/audiobook-remote';
 import { getAudiobookStorage, audiobookStorageUrl } from '@/lib/audiobook-storage-admin';
 export const dynamic='force-dynamic';
 export async function POST(request:Request) {
   try {
     const remote=await remoteAccess();
+    await assertAudiobookCapacity();
     if(Number(request.headers.get('content-length'))>4096) return new Response(null,{status:413});
     const body=await request.json();
     const job=await remote('/cloud-jobs',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':body.key || ''},body:JSON.stringify({filename:body.filename,target:body.target,size:body.size,mode:body.mode,start:body.start,duration:body.duration})});

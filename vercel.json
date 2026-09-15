@@ -1,6 +1,15 @@
 {
   "framework": "nextjs",
-  "crons": [{"path":"/api/queue/cleanup","schedule":"*/15 * * * *"}],
+  "crons": [
+    {
+      "path": "/api/queue/cleanup",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/audiobook/monitor",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/download/:id([0-9a-f-]{36})",
@@ -11,12 +20,30 @@
     {
       "source": "/download/:path*",
       "headers": [
-        {"key":"Cache-Control","value":"private, no-store"},
-        {"key":"CDN-Cache-Control","value":"no-store"},
-        {"key":"Vercel-CDN-Cache-Control","value":"no-store"},
-        {"key":"x-vercel-enable-rewrite-caching","value":"0"},
-        {"key":"Referrer-Policy","value":"no-referrer"},
-        {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive"}
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "x-vercel-enable-rewrite-caching",
+          "value": "0"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        }
       ]
     }
   ]
