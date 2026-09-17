@@ -1,0 +1,163 @@
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap");
+
+.distans-demo-header {
+  display: flex;
+  justify-content: center;
+  padding: 40px 24px 0;
+  background: #f7f3ee;
+}
+
+.distans-demo-page {
+  min-height: calc(100vh - 80px);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 98, 0, 0.12), transparent),
+    linear-gradient(180deg, #f7f3ee 0%, #f1ede8 40%, #ebe6df 100%);
+  color: #1a1a1a;
+  font-family: "Archivo", sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.distans-demo-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 36px 24px 96px;
+}
+
+.distans-demo-kicker {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ff6200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.distans-demo-kicker::before {
+  content: "";
+  width: 26px;
+  height: 2px;
+  background: #ff6200;
+}
+
+.distans-demo-title {
+  font-family: "Clash Display", sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 4.2vw, 2.7rem);
+  line-height: 1.04;
+  letter-spacing: -0.028em;
+  margin-bottom: 14px;
+}
+
+.distans-demo-sub {
+  color: rgba(26, 26, 26, 0.62);
+  font-size: 18px;
+  max-width: 48ch;
+  margin-bottom: 28px;
+}
+
+.distans-demo-panel {
+  margin-top: 8px;
+}
+
+.distans-demo-rules {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  color: rgba(26, 26, 26, 0.72);
+  font-size: 15px;
+}
+
+.distans-demo-rules li {
+  padding: 6px 0 6px 18px;
+  position: relative;
+}
+
+.distans-demo-rules li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.85em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff6200;
+}
+
+.distans-demo-field-label {
+  display: block;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+
+.distans-demo-input {
+  width: 100%;
+  padding: 11px 14px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+  color: inherit;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.distans-demo-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.distans-demo-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.distans-demo-footnote {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.distans-demo-error {
+  color: #ff6200;
+  font-weight: 500;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.distans-demo-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(26, 26, 26, 0.12);
+  overflow: hidden;
+}
+
+.distans-demo-progress > div {
+  height: 100%;
+  background: #ff6200;
+  transition: width 0.15s ease;
+}
+
+.distans-demo-success {
+  font-weight: 700;
+  color: #ff6200;
+  padding: 12px 0 2px;
+  font-size: 15px;
+  text-align: left;
+}
+
+@media (max-width: 560px) {
+  .distans-demo-shell {
+    padding: 24px 18px 72px;
+  }
+
+  .distans-demo-sub {
+    font-size: 16px;
+  }
+}
