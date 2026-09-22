@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>studio.saltwaves.audiobook.tunnel</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/cloudflared</string>
+		<string>tunnel</string>
+		<string>--no-autoupdate</string>
+		<string>--metrics</string>
+		<string>127.0.0.1:20246</string>
+		<string>run</string>
+		<string>--token-file</string>
+		<string>/Users/marcusbornold/Saltwaves-Audiobook/ops/cloudflare/tunnel.token</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/marcusbornold/Saltwaves-Audiobook/logs/tunnel.error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/marcusbornold/Saltwaves-Audiobook/logs/tunnel.log</string>
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/marcusbornold/Saltwaves-Audiobook</string>
+</dict>
+</plist>

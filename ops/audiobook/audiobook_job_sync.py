@@ -94,9 +94,16 @@ def publish_health(jobs, url, headers):
                 last=f.read().decode().splitlines()[-1]
             cleanup_failed=bool(json.loads(last).get('failed', ['unknown']))
         except Exception: pass
+    watchdog=DATA/'operations-watchdog-heartbeat'
+    watchdog_state={}
+    try: watchdog_state=json.loads((DATA/'operations-watchdog.json').read_text())
+    except (OSError,ValueError): pass
     active=[j for j in jobs if (j.get('expires') or 0)>now]
     queued=[j for j in active if j['state']=='queued']
-    data={'workerAgeSeconds':max(0,now-heartbeat.stat().st_mtime) if heartbeat.exists() else None,
+    data={'opsWatchdogEnabled':(DATA/'operations-watchdog.enabled').exists(),
+          'opsWatchdogAgeSeconds':max(0,now-watchdog.stat().st_mtime) if watchdog.exists() else None,
+          'opsWatchdogMailBlocked':bool(watchdog_state.get('mail_blocked')),
+          'workerAgeSeconds':max(0,now-heartbeat.stat().st_mtime) if heartbeat.exists() else None,
           'diskFreeBytes':shutil.disk_usage(DATA).free,
           'cleanupAgeSeconds':max(0,now-cleanup.stat().st_mtime) if cleanup.exists() else None,
           'cleanupFailed':cleanup_failed,'queued':len(queued),

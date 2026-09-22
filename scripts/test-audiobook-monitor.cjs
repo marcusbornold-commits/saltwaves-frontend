@@ -1,8 +1,8 @@
 const assert=require('node:assert/strict');
 const ts=require('typescript'),fs=require('node:fs'),vm=require('node:vm');
 const code=ts.transpile(fs.readFileSync('lib/audiobook-monitor-checks.ts','utf8'),{module:ts.ModuleKind.CommonJS});
-const moduleStub={exports:{}};vm.runInNewContext(code,{exports:moduleStub.exports,fetch,AbortSignal});
-const {healthIssues,checkMiniService,miniServiceIssue}=moduleStub.exports;
+const moduleStub={exports:{}};vm.runInNewContext(code,{exports:moduleStub.exports,fetch,AbortSignal,console});
+const {healthIssues,checkMiniService,miniServiceIssue,retryMonitorOperation}=moduleStub.exports;
 const now=Date.now(),at=new Date(now).toISOString();
 const good={workerAgeSeconds:3,diskFreeBytes:10*1024**3,cleanupAgeSeconds:30,cleanupFailed:false,queued:0,running:0,oldestQueuedAgeSeconds:0,recentErrors:0};
 assert.equal(healthIssues(good,at,now).length,0);
@@ -18,6 +18,14 @@ console.log('6 monitor scenarios passed');
   assert.match(miniServiceIssue(false, good, at, now), /Anslutningen/);
   assert.match(miniServiceIssue(false, good, new Date(now-301000).toISOString(), now), /livstecken.*saknas/);
   assert.match(miniServiceIssue(false, {...good,workerAgeSeconds:70}, at, now), /livstecken.*saknas/);
+  assert.equal(healthIssues({...good,opsWatchdogEnabled:true,opsWatchdogAgeSeconds:601},at,now).length,1);
+  assert.equal(healthIssues({...good,opsWatchdogEnabled:true,opsWatchdogAgeSeconds:1},at,now).length,0);
+  let retryCalls=0;
+  assert.equal(await retryMonitorOperation(async()=>{if(++retryCalls===1)throw new Error('private detail');return 42;},'test'),42);
+  assert.equal(retryCalls,2);
+  retryCalls=0;
+  await assert.rejects(()=>retryMonitorOperation(async()=>{retryCalls++;throw new Error('failed');},'test'));
+  assert.equal(retryCalls,2);
   let calls=0;
   const recovered=await checkMiniService('https://example.test/health',async()=>{
     if (++calls===1) throw Object.assign(new Error('private detail'),{name:'TimeoutError'});
