@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PYTHONUNBUFFERED</key>
+		<string>1</string>
+	</dict>
+	<key>Label</key>
+	<string>studio.saltwaves.audiobook.operations-watchdog</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/marcusbornold/podmaster-env/bin/python</string>
+		<string>/Users/marcusbornold/Saltwaves-Audiobook/ops/operations_watchdog.py</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/marcusbornold/Saltwaves-Audiobook/logs/operations-watchdog.error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/marcusbornold/Saltwaves-Audiobook/logs/operations-watchdog.log</string>
+	<key>StartInterval</key>
+	<integer>120</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/marcusbornold/Saltwaves-Audiobook</string>
+</dict>
+</plist>
