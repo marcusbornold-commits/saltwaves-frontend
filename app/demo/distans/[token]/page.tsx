@@ -70,9 +70,10 @@ export default async function DistansDemoPage({ params }: PageProps) {
           Hear the difference.
         </h1>
         <p className="distans-demo-sub">
-          Upload a <strong>raw single-track</strong> recording — the same kind
-          of file you&apos;d send for mastering. Do not use a published episode
-          or an already-processed mix.
+          Upload a <strong>raw single-track</strong>
+          {" "}
+          recording — the same kind of file you&apos;d send for mastering. Do
+          not use a published episode or an already-processed mix.
         </p>
         <DistansDemoClient link={toPublicDistansDemoLink(link)} />
       </div>

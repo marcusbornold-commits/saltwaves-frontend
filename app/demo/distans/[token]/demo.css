@@ -47,8 +47,8 @@
 .distans-demo-title {
   font-family: "Clash Display", sans-serif;
   font-weight: 700;
-  font-size: clamp(1.9rem, 4.2vw, 2.7rem);
-  line-height: 1.08;
+  font-size: clamp(1.7rem, 4.2vw, 2.7rem);
+  line-height: 1.1;
   letter-spacing: -0.028em;
   margin-bottom: 14px;
 }
@@ -155,6 +155,11 @@
 @media (max-width: 560px) {
   .distans-demo-shell {
     padding: 24px 18px 72px;
+  }
+
+  /* Keep each sentence on its own line after the <br /> — avoid mid-phrase wrap. */
+  .distans-demo-title {
+    font-size: clamp(1.45rem, 6.8vw, 1.85rem);
   }
 
   .distans-demo-sub {

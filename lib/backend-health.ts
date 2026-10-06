@@ -117,9 +117,17 @@ export function useBackendHealth(): {
 
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
     const run = async () => {
-      const result = await checkBackendHealth();
-      if (!cancelled) commit(result);
+      // Overlapping mount+focus (or interval) must not double-count one outage.
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const result = await checkBackendHealth();
+        if (!cancelled) commit(result);
+      } finally {
+        inFlight = false;
+      }
     };
 
     void run();

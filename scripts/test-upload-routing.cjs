@@ -105,6 +105,10 @@ async function runTransport(transport) {
   assert.equal(state.health, "up");
   assert.equal(state.consecutiveFailures, 0);
 
+  // First probe alone never shows offline — needs a second consecutive failure.
+  state = reduceBackendHealth("unknown", 0, "down");
+  assert.notEqual(state.health, "down");
+
   console.log(
     "PASS: paid path, Free Mini dependency, per-request timeout, retry, consecutive UI gate",
   );
