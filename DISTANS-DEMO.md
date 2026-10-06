@@ -45,7 +45,7 @@ where token = '<token>';
 ## What happens on first upload
 
 1. Prospect opens `/demo/distans/<token>`. The server loads `distans_demo_links` where `token` matches and `active = true`. Invalid / inactive → English error page.
-2. They pick a **raw single-track** file (WAV / MP3 / M4A). Client + `/api/demo/distans/[token]/upload-token` enforce **max 2 GB** and **max 1 hour**.
+2. They pick a **raw single-track** file (WAV / MP3 / M4A). Client + `/api/demo/distans/[token]/upload-token` enforce **max 1 GB** and **max 1 hour**.
 3. Browser mints a short-lived upload JWT (`lifetime_creator` tier for Mini headroom), then uploads **directly to the Mini** `/upload` with query params `tool=distans_demo` and `demo_token=<token>` (plus email / mic).
 4. On success the UI shows the same “queued / we’ll email you” outcome as PodMaster B2C. Mastered file delivery and 48h retention are unchanged.
 5. The page POSTs `/api/demo/distans/[token]/ack`, which sets `first_upload_at` **once** (first successful upload only; later uploads leave the timestamp alone).
@@ -67,7 +67,7 @@ Also extends `upload_events.tool` to allow `distans_demo` (alongside `podmaster`
 
 ## Backend note (Mini)
 
-Frontend enforces 2 GB / 1 h. The upload JWT uses the `lifetime_creator` tier so the Mini does not apply free-tier ceilings. Confirm the FastAPI `/upload` path accepts `tool=distans_demo` (and optional `demo_token`) for attribution into `upload_events` / job metadata. If Mini still caps below 2 GB, raise that ceiling for `tool=distans_demo` on the backend.
+Frontend enforces 1 GB (1024 MB) / 1 h. The upload JWT uses the `lifetime_creator` tier so the Mini does not apply free-tier ceilings. Confirm the FastAPI `/upload` path accepts `tool=distans_demo` (and optional `demo_token`) for attribution into `upload_events` / job metadata. The PodMaster backend (Mac Mini) still has its own demo size ceiling — lower that separately to match 1024 MB for `tool=distans_demo`.
 
 ## MVP out of scope
 

@@ -1,65 +1,125 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type BackendHealth = "unknown" | "up" | "down";
 
-const HEALTH_TIMEOUT_MS = 4000;
+/** Per fetch — queue health and Mini `/health` each get their own budget. */
+const PER_REQUEST_TIMEOUT_MS = 10_000;
+/** Brief pause before the single retry on a failed probe. */
+const RETRY_DELAY_MS = 400;
 const RECHECK_INTERVAL_MS = 60_000;
+/** UI "offline" only after this many consecutive failed probes. */
+export const CONSECUTIVE_FAILURES_TO_MARK_DOWN = 2;
 
 export const BACKEND_DOWN_MESSAGE =
   "Mastering is offline right now. Nothing was uploaded — try again in a little while.";
 
-/**
- * Pings FastAPI `/health` through the public Funnel URL.
- * Resolves "down" on any network failure, non-2xx, or timeout. Never throws.
- */
-export async function checkBackendHealth(): Promise<BackendHealth> {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-  if (!apiBase) return "down";
-
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), PER_REQUEST_TIMEOUT_MS);
   try {
-    const queue=await fetch('/api/queue/health',{cache:'no-store',signal:controller.signal});
-    if(!queue.ok) return 'down';
-    const config=await queue.json();
-    if(config.transport==='storage') return 'up';
-    const res = await fetch(`${apiBase}/health`, {
-      method: "GET",
+    return await fetch(url, {
+      ...init,
       cache: "no-store",
       signal: controller.signal,
     });
-    return res.ok ? "up" : "down";
-  } catch {
-    return "down";
   } finally {
     clearTimeout(timer);
   }
 }
 
+async function probeBackendOnce(): Promise<BackendHealth> {
+  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (!apiBase) return "down";
+
+  try {
+    const queue = await fetchWithTimeout("/api/queue/health");
+    if (!queue.ok) return "down";
+    const config = await queue.json();
+    if (config.transport === "storage") return "up";
+    const res = await fetchWithTimeout(`${apiBase}/health`, { method: "GET" });
+    return res.ok ? "up" : "down";
+  } catch {
+    return "down";
+  }
+}
+
+/**
+ * Pings queue health, then FastAPI `/health` through the public Funnel URL when
+ * transport is Mini. Each request has its own timeout so a slow Funnel TLS
+ * handshake cannot burn the whole budget. Retries once before returning "down".
+ * Never throws.
+ */
+export async function checkBackendHealth(): Promise<BackendHealth> {
+  const first = await probeBackendOnce();
+  if (first === "up") return "up";
+  await new Promise<void>((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+  return probeBackendOnce();
+}
+
+/**
+ * Maps a probe result onto displayed health. A single failure never flips the
+ * UI to "down"; recovery on any success is immediate.
+ */
+export function reduceBackendHealth(
+  previous: BackendHealth,
+  consecutiveFailures: number,
+  result: BackendHealth,
+): { health: BackendHealth; consecutiveFailures: number } {
+  if (result === "up") {
+    return { health: "up", consecutiveFailures: 0 };
+  }
+  const nextFailures = consecutiveFailures + 1;
+  if (nextFailures >= CONSECUTIVE_FAILURES_TO_MARK_DOWN) {
+    return { health: "down", consecutiveFailures: nextFailures };
+  }
+  // Keep prior "up" so one blip does not disable the dropzone; otherwise stay unknown.
+  return {
+    health: previous === "up" ? "up" : "unknown",
+    consecutiveFailures: nextFailures,
+  };
+}
+
 /**
  * Checks once on mount, then every minute while the tab is visible, and again
  * when the tab regains focus. Starts as "unknown" so the UI never flashes an
- * outage message before the first answer has arrived.
+ * outage message before the first answer has arrived. Displayed "down" requires
+ * consecutive failures; `recheck` still returns the latest probe so uploads
+ * refuse when the backend is actually unreachable.
  */
 export function useBackendHealth(): {
   health: BackendHealth;
   recheck: () => Promise<BackendHealth>;
 } {
   const [health, setHealth] = useState<BackendHealth>("unknown");
+  const healthRef = useRef<BackendHealth>("unknown");
+  const failuresRef = useRef(0);
 
-  const recheck = async () => {
-    const next = await checkBackendHealth();
-    setHealth(next);
-    return next;
+  const commit = (result: BackendHealth): BackendHealth => {
+    // Compute outside setState so React Strict Mode cannot double-count failures.
+    const resolved = reduceBackendHealth(
+      healthRef.current,
+      failuresRef.current,
+      result,
+    );
+    healthRef.current = resolved.health;
+    failuresRef.current = resolved.consecutiveFailures;
+    setHealth(resolved.health);
+    // Upload gate uses the raw probe (already retried), not the smoothed UI state.
+    return result;
   };
+
+  const recheck = async () => commit(await checkBackendHealth());
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      const next = await checkBackendHealth();
-      if (!cancelled) setHealth(next);
+      const result = await checkBackendHealth();
+      if (!cancelled) commit(result);
     };
 
     void run();

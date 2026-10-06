@@ -4,6 +4,7 @@ import {
   DISTANS_DEMO_ACCESS,
   distansDemoDurationError,
   distansDemoFileSizeError,
+  distansDemoMaxSizeLabel,
 } from "@/lib/distans-demo-limits";
 import { exceedsDuration, exceedsFileSize } from "@/lib/access-limits";
 import { uploadDistansDemoAudio } from "@/lib/distans-demo-upload";
@@ -187,7 +188,7 @@ export function DistansDemoClient({
     <section className="distans-demo-panel" aria-label="Distans demo upload">
       <ul className="distans-demo-rules">
         <li>Raw single-track only — never a published episode.</li>
-        <li>Max 2 GB · max 1 hour.</li>
+        <li>Max {distansDemoMaxSizeLabel()} · max 1 hour.</li>
         <li>WAV, MP3, or M4A.</li>
         <li>We email the mastered file. Links stay available for 48 hours.</li>
       </ul>
@@ -245,7 +246,8 @@ export function DistansDemoClient({
               {dragging ? "Drop your raw track" : "Drop your raw single-track"}
             </div>
             <div className="microcopy">
-              .wav, .mp3, or .m4a — max 2 GB / 1 hour — or click to browse
+              .wav, .mp3, or .m4a — max {distansDemoMaxSizeLabel()} / 1 hour — or
+              click to browse
             </div>
             {backendDown && (
               <p className="distans-demo-error">{BACKEND_DOWN_MESSAGE}</p>

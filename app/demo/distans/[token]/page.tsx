@@ -64,7 +64,11 @@ export default async function DistansDemoPage({ params }: PageProps) {
     <main className="distans-demo-page">
       <div className="distans-demo-shell">
         <p className="distans-demo-kicker">Private Distans demo</p>
-        <h1 className="distans-demo-title">Hear Distans on your own audio</h1>
+        <h1 className="distans-demo-title">
+          Send one raw episode.
+          <br />
+          Hear the difference.
+        </h1>
         <p className="distans-demo-sub">
           Upload a <strong>raw single-track</strong> recording — the same kind
           of file you&apos;d send for mastering. Do not use a published episode
