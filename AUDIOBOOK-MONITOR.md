@@ -1,3 +1,13 @@
+## Shared Supabase configuration (2026-10-06)
+
+Audiobook now uses `foxohcrjubrregfjfznl`, the existing Pro project, by explicit owner request. Keep the dedicated Audiobook project paused. Set only the namespaced `AUDIOBOOK_STORAGE_URL` and `AUDIOBOOK_STORAGE_SERVICE_ROLE_KEY` on Mini and Vercel; PodMaster configuration is unchanged.
+
+Use the private `audiobook-private` bucket with its existing 1,048,576,000-byte limit. Input and delivered master must both fit. Full masters use 48 kHz / 24-bit WAV and may need chapter splitting. The Mini checks estimated delivery size before DSP and shows a size error. Preview MP3s and HTML reports remain private, with existing 48-hour expiry.
+
+Apply `20261006082559_audiobook_shared_project.sql` only to the shared project. These Audiobook tables have RLS and service-role-only grants. Sync caches are scoped to the storage URL so changing projects republishes rows. Enable job sync, then production monitoring and the operations watchdog only after the new deployment passes its probe.
+
+The historical setup below refers to the original dedicated project and must not be used as current deployment instructions.
+
 # Audiobook monitoring
 
 Dedicated Supabase project: xuxqrkposxrvhwvwjroc. Never run this migration in PodMaster's project.

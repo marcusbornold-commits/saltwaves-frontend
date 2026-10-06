@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'unauthorized' }, { status: 401, headers });
   if (process.env.AUDIOBOOK_MONITOR_ENABLED !== 'true')
     return Response.json({ error: 'monitor_disabled' }, { status: 503, headers });
-  if (audiobookStorageUrl().url.replace(/\/$/, '') !== 'https://xuxqrkposxrvhwvwjroc.supabase.co')
+  if (audiobookStorageUrl().url.replace(/\/$/, '') !== 'https://foxohcrjubrregfjfznl.supabase.co')
     return Response.json({ error: 'wrong_project' }, { status: 503, headers });
 
   const db = getAudiobookStorage();
