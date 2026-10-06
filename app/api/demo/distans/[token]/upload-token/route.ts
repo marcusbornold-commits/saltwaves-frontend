@@ -18,7 +18,7 @@ function json(body: Record<string, unknown>, status = 200): NextResponse {
 
 /**
  * Mints a short-lived PodMaster upload JWT for an active Distans demo link.
- * Validates the opaque URL token server-side and enforces 2 GB / 1 h limits
+ * Validates the opaque URL token server-side and enforces 1 GB / 1 h limits
  * before the browser talks to the Mini.
  */
 export async function POST(
@@ -123,7 +123,7 @@ export async function POST(
   }
 
   // lifetime_creator maximises Mini size headroom; this route still enforces
-  // Distans demo product limits (2 GB / 1 h).
+  // Distans demo product limits (1 GB / 1 h).
   const uploadToken = await signUploadToken({
     userId: link.id,
     email,
