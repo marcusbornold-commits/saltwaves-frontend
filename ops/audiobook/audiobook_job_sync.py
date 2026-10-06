@@ -117,8 +117,8 @@ def publish_health(jobs, url, headers):
 def sync():
     url=os.environ.get('AUDIOBOOK_STORAGE_URL','').rstrip('/')
     key=os.environ.get('AUDIOBOOK_STORAGE_SERVICE_ROLE_KEY','')
-    if url != 'https://xuxqrkposxrvhwvwjroc.supabase.co' or not key:
-        raise RuntimeError('Dedicated Audiobook project required')
+    if url != 'https://foxohcrjubrregfjfznl.supabase.co' or not key:
+        raise RuntimeError('Configured Audiobook storage project required')
     headers={'apikey':key,'Authorization':'Bearer '+key}
     with (DATA/'job-sync.lock').open('w') as lock:
         try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -126,7 +126,7 @@ def sync():
         with contextlib.closing(sqlite3.connect(f'file:{DATA}/jobs.sqlite?mode=ro',uri=True)) as db:
             db.row_factory=sqlite3.Row
             jobs=[dict(r) for r in db.execute('SELECT * FROM jobs')]
-        with sqlite3.connect(DATA/'job-sync.sqlite') as cache:
+        with sqlite3.connect(DATA/('job-sync-'+hashlib.sha256(url.encode()).hexdigest()[:16]+'.sqlite')) as cache:
             cache.execute('CREATE TABLE IF NOT EXISTS synced (id TEXT PRIMARY KEY, digest TEXT)')
             changed=0
             for job in jobs:

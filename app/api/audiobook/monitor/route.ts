@@ -17,7 +17,7 @@ export async function GET(request:Request) {
   const expected=Buffer.from(`Bearer ${secret}`),supplied=Buffer.from(request.headers.get('authorization') || '');
   if(secret.length<32 || supplied.length!==expected.length || !timingSafeEqual(supplied,expected)) return Response.json({error:'unauthorized'},{status:401,headers});
   if(process.env.AUDIOBOOK_MONITOR_ENABLED!=='true') return Response.json({enabled:false},{headers});
-  if(audiobookStorageUrl().url.replace(/\/$/,'')!=='https://xuxqrkposxrvhwvwjroc.supabase.co') return Response.json({error:'wrong_project'},{status:503,headers});
+  if(audiobookStorageUrl().url.replace(/\/$/,'')!=='https://foxohcrjubrregfjfznl.supabase.co') return Response.json({error:'wrong_project'},{status:503,headers});
   const db=getAudiobookStorage();
   const issues:string[]=[];
   const checkId=String(Math.floor(Date.now()/300000));
@@ -59,7 +59,7 @@ export async function GET(request:Request) {
       const recovery=item.kind==='recovery', test=item.kind==='test';
       await email(`audiobook-monitor-${item.id}`,test?'Saltwaves: test av driftlarm':recovery?'Saltwaves: driften fungerar igen':'Saltwaves: driftstörning i Audiobook',
         test?'Detta är ett test av Audiobooks nya driftövervakning. Ingen driftstörning har skapats. Du får mejl när tre kontroller i följd visar fel och när två efterföljande kontroller visar normal drift.':recovery?'Två kontroller i följd visar normal drift i Audiobook. Ingen manuell omstart har gjorts av övervakningen.':
-        'Tre kontroller i följd visar en driftstörning:\n\n'+item.issues.join('\n')+'\n\nAutomatik: befintlig processövervakning startar kraschade tjänster, och nätöverföringar samt jobbsynkning försöker igen. Pågående mastringar startas inte om av detta larm. Kontrollera Mac Mini, nätanslutningen och jobböversikten i Supabase.\n\nhttps://supabase.com/dashboard/project/xuxqrkposxrvhwvwjroc/editor/17494?schema=public');
+        'Tre kontroller i följd visar en driftstörning:\n\n'+item.issues.join('\n')+'\n\nAutomatik: befintlig processövervakning startar kraschade tjänster, och nätöverföringar samt jobbsynkning försöker igen. Pågående mastringar startas inte om av detta larm. Kontrollera Mac Mini, nätanslutningen och jobböversikten i Supabase.\n\nhttps://supabase.com/dashboard/project/foxohcrjubrregfjfznl/editor?schema=public');
       const saved=await db.from('audiobook_monitor_notifications').update({sent_at:new Date().toISOString()}).eq('id',item.id).abortSignal(AbortSignal.timeout(6000));
       if(saved.error) throw saved.error;
       sent++;

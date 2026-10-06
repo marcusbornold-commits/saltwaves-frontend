@@ -19,7 +19,7 @@ class Tests(unittest.TestCase):
   for key in ['file_name','user_id','report','report_storage_path','error_message']:self.assertIsNone(r[key])
   self.assertEqual(r['status'],'expired')
  def test_failure_retry_and_dedup(self):
-  with tempfile.TemporaryDirectory() as td,patch.object(m,'DATA',Path(td)),patch.object(m,'publish_health'),patch.dict(os.environ,{'AUDIOBOOK_STORAGE_URL':'https://xuxqrkposxrvhwvwjroc.supabase.co','AUDIOBOOK_STORAGE_SERVICE_ROLE_KEY':'test'}):
+  with tempfile.TemporaryDirectory() as td,patch.object(m,'DATA',Path(td)),patch.object(m,'publish_health'),patch.dict(os.environ,{'AUDIOBOOK_STORAGE_URL':'https://foxohcrjubrregfjfznl.supabase.co','AUDIOBOOK_STORAGE_SERVICE_ROLE_KEY':'test'}):
    j=self.job()
    with sqlite3.connect(Path(td)/'jobs.sqlite') as db:
     db.execute('create table jobs ('+','.join(k for k in j)+')');db.execute('insert into jobs values ('+','.join('?' for k in j)+')',list(j.values()))

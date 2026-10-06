@@ -21,7 +21,7 @@ const moduleStub={exports:{}};
 const code=ts.transpile(fs.readFileSync('app/api/audiobook/monitor/probe/route.ts','utf8'),{module:ts.ModuleKind.CommonJS});
 vm.runInNewContext(code,{exports:moduleStub.exports,Buffer,Response,AbortSignal,process:{env:{AUDIOBOOK_MONITOR_PROBE_SECRET:secret,AUDIOBOOK_MONITOR_ENABLED:'true'}},require:name=>{
   if(name==='node:crypto')return require(name);
-  if(name.includes('storage-admin'))return {getAudiobookStorage:()=>({from}),audiobookStorageUrl:()=>({url:'https://xuxqrkposxrvhwvwjroc.supabase.co'})};
+  if(name.includes('storage-admin'))return {getAudiobookStorage:()=>({from}),audiobookStorageUrl:()=>({url:'https://foxohcrjubrregfjfznl.supabase.co'})};
   if(name.includes('monitor-checks'))return {retryMonitorOperation:op=>op()};
   throw Error(name);
 }});
