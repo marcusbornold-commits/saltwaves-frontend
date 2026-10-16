@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { audiobookAccess } from "@/lib/audiobook-access";
 import StudioV1 from "./StudioV1";
-export const metadata: Metadata = { title: "Studio — Saltwaves", description: "Mät, justera och mastra din ljudbok.", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Saltwaves Studio – Ljudbok", description: "Mastering för ljudböcker. Privat förhandsvisning.", robots: { index: false, follow: false } };
 export default async function Page() {
   if (process.env.NODE_ENV === "production" || process.env.AUDIOBOOK_REMOTE_DEV === "true") {
     if (process.env.AUDIOBOOK_ENABLED !== "true" || !process.env.AUDIOBOOK_STUDIO_API_URL) notFound();
