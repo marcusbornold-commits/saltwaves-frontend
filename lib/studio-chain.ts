@@ -24,7 +24,10 @@ registerProcessor("sw-limiter",L);`;
 let limiterUrl: string | null = null;
 export async function loadLimiter(ctx: BaseAudioContext) {
   if (!limiterUrl) limiterUrl = URL.createObjectURL(new Blob([LIMITER_SRC], { type: "application/javascript" }));
+  // AudioWorklet finns bara i säker kontext (https/localhost). Över http://<tailscale-ip> faller vi tillbaka på en kompressor-limiter.
+  if (!ctx.audioWorklet) return false;
   await ctx.audioWorklet.addModule(limiterUrl);
+  return true;
 }
 
 export type Chain = { input: AudioNode; preLimiter: GainNode; autoGain: GainNode; output: AudioNode; update: (p: Params, autoGainDb: number) => void };
@@ -52,8 +55,9 @@ export function buildChain(ctx: BaseAudioContext, p: Params, autoGainDb: number,
   deWet.connect(preLimiter); deIn.connect(deBypass).connect(preLimiter);
   preLimiter.connect(autoGain);
   let output: AudioNode = autoGain;
-  let limiter: AudioWorkletNode | null = null;
-  if (withLimiter) { limiter = new AudioWorkletNode(ctx, "sw-limiter"); autoGain.connect(limiter); output = limiter; }
+  let limiter: AudioWorkletNode | null = null; let fallback: DynamicsCompressorNode | null = null;
+  if (withLimiter && ctx.audioWorklet) { limiter = new AudioWorkletNode(ctx, "sw-limiter"); autoGain.connect(limiter); output = limiter; }
+  else if (withLimiter) { fallback = ctx.createDynamicsCompressor(); fallback.ratio.value = 20; fallback.knee.value = 0; fallback.attack.value = 0.001; fallback.release.value = 0.08; autoGain.connect(fallback); output = fallback; }
   const update = (q: Params, ag: number) => {
     hpf.frequency.value = q.hpf > 0 ? q.hpf : 1;
     low.frequency.value = q.low.f; low.gain.value = q.low.g;
@@ -68,6 +72,7 @@ export function buildChain(ctx: BaseAudioContext, p: Params, autoGainDb: number,
     deWet.gain.value = q.deess.on ? 1 : 0; deBypass.gain.value = q.deess.on ? 0 : 1;
     autoGain.gain.value = dbToLin(ag);
     if (limiter) limiter.parameters.get("ceiling")!.value = dbToLin(Math.min(q.limiter.ceiling, -3.3));
+    if (fallback) fallback.threshold.value = Math.min(q.limiter.ceiling, -3.3) - 1.5;
   };
   update(p, autoGainDb);
   return { input, preLimiter, autoGain, output, update };

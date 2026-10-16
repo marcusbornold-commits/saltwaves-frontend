@@ -24,17 +24,48 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 async function decode(url: string, ctx: BaseAudioContext) { return ctx.decodeAudioData(await (await fetch(url)).arrayBuffer()); }
 
-function Waveform({ buffer, position, onSeek }: { buffer: AudioBuffer | null; position: number; onSeek: (t: number) => void }) {
+type Region = { start: number; length: number };
+const MIN_REGION = 60, MAX_REGION = 300, DEFAULT_REGION = 120;
+const fitRegion = (start: number, length: number, total: number): Region => {
+  const len = Math.min(Math.max(MIN_REGION, Math.min(MAX_REGION, length)), total);
+  return { start: Math.max(0, Math.min(start, total - len)), length: len };
+};
+const mmss = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+
+function Waveform({ buffer, position, onSeek, region, onRegion }: { buffer: AudioBuffer | null; position: number; onSeek: (t: number) => void; region?: Region | null; onRegion?: (r: Region) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const drag = useRef<{ mode: "move" | "l" | "r"; x0: number; r0: Region; moved: boolean } | null>(null);
   useEffect(() => {
     const c = ref.current; if (!c || !buffer) return;
     const w = c.width = c.clientWidth * 2, h = c.height = 160, g = c.getContext("2d")!;
     const d = buffer.getChannelData(0), step = Math.max(1, Math.floor(d.length / w));
-    g.clearRect(0, 0, w, h); g.fillStyle = "#24241f";
+    g.clearRect(0, 0, w, h);
+    if (region) { const x0 = region.start / buffer.duration * w, x1 = (region.start + region.length) / buffer.duration * w; g.fillStyle = "rgba(230,107,56,.14)"; g.fillRect(x0, 0, x1 - x0, h); g.fillStyle = "#e66b38"; g.fillRect(x0, 0, 4, h); g.fillRect(x1 - 4, 0, 4, h); }
+    g.fillStyle = "#24241f";
     for (let x = 0; x < w; x++) { let p = 0; for (let i = x * step; i < (x + 1) * step && i < d.length; i++) p = Math.max(p, Math.abs(d[i])); const y = p * h / 2; g.fillRect(x, h / 2 - y, 1, Math.max(1, y * 2)); }
-    g.fillStyle = "#e66b38"; g.fillRect(Math.floor(position / buffer.duration * w), 0, 3, h);
-  }, [buffer, position]);
-  return <canvas className="st-wave" ref={ref} onClick={e => { if (!buffer) return; const r = e.currentTarget.getBoundingClientRect(); onSeek((e.clientX - r.left) / r.width * buffer.duration); }} />;
+    g.fillStyle = "#1f5fbf"; g.fillRect(Math.floor(position / buffer.duration * w), 0, 3, h);
+  }, [buffer, position, region]);
+  const tAt = (e: React.PointerEvent<HTMLCanvasElement>) => { const r = e.currentTarget.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (buffer?.duration ?? 0); };
+  return <canvas className="st-wave" ref={ref}
+    onPointerDown={e => {
+      if (!buffer) return; const t = tAt(e);
+      if (region && onRegion) {
+        const px = buffer.duration / e.currentTarget.getBoundingClientRect().width * 8, end = region.start + region.length;
+        const mode = Math.abs(t - region.start) < px ? "l" : Math.abs(t - end) < px ? "r" : t > region.start && t < end ? "move" : null;
+        if (mode) { drag.current = { mode, x0: t, r0: region, moved: false }; e.currentTarget.setPointerCapture(e.pointerId); return; }
+      }
+      onSeek(t);
+      if (region && onRegion) onRegion(fitRegion(t, region.length, buffer.duration));
+    }}
+    onPointerMove={e => {
+      const D = drag.current; if (!D || !buffer || !onRegion) return; const t = tAt(e), dt = t - D.x0;
+      if (Math.abs(dt) > 0.2) D.moved = true; if (!D.moved) return;
+      const end = D.r0.start + D.r0.length;
+      if (D.mode === "move") onRegion(fitRegion(D.r0.start + dt, D.r0.length, buffer.duration));
+      else if (D.mode === "l") { const s = Math.max(0, Math.min(t, end - MIN_REGION)); onRegion(fitRegion(Math.max(s, end - MAX_REGION), end - Math.max(s, end - MAX_REGION), buffer.duration)); }
+      else { const en = Math.min(buffer.duration, Math.max(t, D.r0.start + MIN_REGION)); onRegion(fitRegion(D.r0.start, Math.min(MAX_REGION, en - D.r0.start), buffer.duration)); }
+    }}
+    onPointerUp={e => { const D = drag.current; drag.current = null; if (D && !D.moved) onSeek(tAt(e)); }} />;
 }
 
 function Checks({ m }: { m: Measure }) {
@@ -71,6 +102,8 @@ export default function StudioV1() {
   const [params, setParams] = useState<Params | null>(null);
   const [file, setFile] = useState<{ id: string; name: string } | null>(null);
   const [orig, setOrig] = useState<AudioBuffer | null>(null);
+  const [region, setRegion] = useState<Region | null>(null);
+  const [exc, setExc] = useState<{ buffer: AudioBuffer; start: number } | null>(null);
   const [origUrl, setOrigUrl] = useState("");
   const [busy, setBusy] = useState(""); const [error, setError] = useState("");
   const [measure, setMeasure] = useState<Measure | null>(null);
@@ -89,6 +122,17 @@ export default function StudioV1() {
   const [masterState, setMasterState] = useState<{ progress?: string; state?: string; result?: Measure; audio?: string; error?: string } | null>(null);
   const input = useRef<HTMLInputElement>(null); const fullInput = useRef<HTMLInputElement>(null);
   const audioEl = useRef<HTMLAudioElement>(null);
+  const origP = useRef<{ ctx: AudioContext; src: AudioBufferSourceNode; started: number; offset: number; raf: number } | null>(null);
+  const [origPlaying, setOrigPlaying] = useState(false); const [origPos, setOrigPos] = useState(0);
+  const stopOrig = () => { const O = origP.current; if (O) { cancelAnimationFrame(O.raf); try { O.src.stop(); } catch { /* */ } void O.ctx.close(); origP.current = null; } setOrigPlaying(false); };
+  const playOrig = (from: number) => {
+    if (!orig) return; stopOrig(); stopLive();
+    const ctx = new AudioContext(); const src = ctx.createBufferSource(); src.buffer = orig; src.connect(ctx.destination);
+    const when = ctx.currentTime + 0.03; src.start(when, Math.min(from, orig.duration - 0.01));
+    const O = { ctx, src, started: when, offset: from, raf: 0 }; origP.current = O; setOrigPlaying(true);
+    src.onended = () => { if (origP.current === O) stopOrig(); };
+    const tick = () => { if (origP.current !== O) return; setOrigPos(Math.min(orig.duration, O.offset + Math.max(0, ctx.currentTime - O.started))); O.raf = requestAnimationFrame(tick); }; O.raf = requestAnimationFrame(tick);
+  };
   const live$ = useRef<{ ctx: AudioContext; chain: Chain; srcs: AudioBufferSourceNode[]; vg: Record<string, GainNode>; og: GainNode; wet: GainNode; mon: GainNode; started: number; offset: number; kA: AnalyserNode; pA: AnalyserNode } | null>(null);
   const spec = specs.find(s => s.id === specId);
 
@@ -101,24 +145,32 @@ export default function StudioV1() {
   };
 
   const choose = async (f: File) => {
-    stopLive(); setError(""); setMeasure(null); setDelivery(null); setVersions(null); setBuffers({}); setMasterState(null); setPrediction(null);
+    stopLive(); stopOrig(); setError(""); setMeasure(null); setDelivery(null); setVersions(null); setBuffers({}); setExc(null); setMasterState(null); setPrediction(null);
     setBusy("Laddar upp och läser in…");
     try {
       const up = await uploadFile(f); setFile({ id: up.id, name: up.filename });
       const url = `${API}/${up.id}/audio/original`; setOrigUrl(url);
-      setOrig(await decode(url, new OfflineAudioContext(1, 1, 48000)));
+      const b = await decode(url, new OfflineAudioContext(1, 1, 48000)); setOrig(b); setRegion(fitRegion(0, DEFAULT_REGION, b.duration)); setPos(0); setOrigPos(0);
     } catch (e) { setError((e as Error).message); } finally { setBusy(""); }
   };
 
   const doMeasure = async () => { if (!file) return; setBusy("Mäter…"); setError(""); try { setMeasure(await api<Measure>(`${file.id}/measure?spec=${specId}&source=${delivery ? "delivery" : "original"}`, { method: "POST" })); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
   const doDelivery = async () => { if (!file) return; setDelivery(null); setMeasure(null); setBusy("Nivå, topp och limiter till spec…"); setError(""); try { const r = await api<{ measure: Measure; audio: string }>(`${file.id}/delivery-fix?spec=${specId}`, { method: "POST" }); setDelivery({ measure: r.measure, url: `${API}/${r.audio}?t=${Date.now()}` }); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
   const doFull = async () => {
-    if (!file) return; stopLive(); setBusy("Kör hela bearbetningskedjan på utdraget…"); setError("");
+    if (!file || !orig) return; stopLive(); stopOrig();
+    const rg = region ?? fitRegion(0, DEFAULT_REGION, orig.duration);
+    if (rg.length < Math.min(MIN_REGION, orig.duration) - 0.01 || rg.length > MAX_REGION + 0.01) { setError("Utsnittet måste vara 1–5 minuter."); return; }
+    setBusy(`Kör hela bearbetningskedjan på utsnittet ${mmss(rg.start)}–${mmss(rg.start + rg.length)}…`); setError("");
+    const t0 = performance.now();
     try {
-      const r = await api<{ versions: Versions }>(`${file.id}/full-chain?spec=${specId}`, { method: "POST" });
+      const r = await api<{ versions: Versions }>(`${file.id}/full-chain?spec=${specId}&start=${rg.start.toFixed(3)}&length=${Math.max(MIN_REGION, rg.length).toFixed(3)}`, { method: "POST" });
       const ctx = new OfflineAudioContext(1, 1, 48000); const out: Record<string, AudioBuffer> = {};
-      await Promise.all(VERSION_KEYS.map(async k => { out[k] = await decode(`${API}/${file.id}/audio/${k}`, ctx); }));
+      await Promise.all(VERSION_KEYS.map(async k => { out[k] = await decode(`${API}/${file.id}/audio/${k}?t=${Date.now()}`, ctx); }));
+      const eb = await decode(`${API}/${file.id}/audio/excerpt?t=${Date.now()}`, ctx);
+      const ex = (r.versions as unknown as { excerpt: Region }).excerpt;
+      setExc({ buffer: eb, start: ex?.start ?? rg.start }); setPos(0);
       setBuffers(out); setVersions(r.versions);
+      (window as unknown as { __studioFullMs?: number }).__studioFullMs = Math.round(performance.now() - t0);
     } catch (e) { setError((e as Error).message); } finally { setBusy(""); }
   };
 
@@ -147,8 +199,8 @@ export default function StudioV1() {
   const stopLive = useCallback(() => { const L = live$.current; if (L) { L.srcs.forEach(s => { try { s.stop(); } catch { /* */ } }); L.ctx.close(); live$.current = null; } setPlaying(false); }, []);
 
   const playLive = async (from = pos) => {
-    if (!chainParams || !orig || !buffers[current]) return;
-    stopLive();
+    if (!chainParams || !exc || !buffers[current]) return;
+    stopLive(); stopOrig();
     const ctx = new AudioContext({ sampleRate: 48000 }); await loadLimiter(ctx);
     const chain = buildChain(ctx, chainParams, prediction?.autoGainDb ?? 0, true);
     const meterIn = ctx.createGain(), mon = ctx.createGain(), wet = ctx.createGain(), og = ctx.createGain();
@@ -159,7 +211,7 @@ export default function StudioV1() {
     meterIn.connect(k1).connect(k2).connect(kA); meterIn.connect(pA);
     const vg: Record<string, GainNode> = {}; const srcs: AudioBufferSourceNode[] = [];
     for (const k of VERSION_KEYS) { const s = ctx.createBufferSource(); s.buffer = buffers[k]; vg[k] = ctx.createGain(); vg[k].gain.value = k === current ? 1 : 0; s.connect(vg[k]).connect(chain.input); srcs.push(s); }
-    const so = ctx.createBufferSource(); so.buffer = orig; so.connect(og); srcs.push(so);
+    const so = ctx.createBufferSource(); so.buffer = exc.buffer; so.connect(og); srcs.push(so);
     const when = ctx.currentTime + 0.05; srcs.forEach(s => s.start(when, from));
     srcs[0].onended = () => { if (live$.current?.srcs === srcs) { setPlaying(false); } };
     live$.current = { ctx, chain, srcs, vg, og, wet, mon, started: when, offset: from, kA, pA };
@@ -173,14 +225,14 @@ export default function StudioV1() {
     if (!playing) return; let raf = 0; const hist: number[] = []; const buf = new Float32Array(4096);
     const tick = () => {
       const L = live$.current; if (!L) return;
-      setPos(Math.min(orig?.duration ?? 0, L.offset + L.ctx.currentTime - L.started));
+      setPos(Math.min(exc?.buffer.duration ?? 0, L.offset + L.ctx.currentTime - L.started));
       L.kA.getFloatTimeDomainData(buf); let e = 0; for (const v of buf) e += v * v; hist.push(e / buf.length); if (hist.length > 180) hist.shift();
       L.pA.getFloatTimeDomainData(buf); let pk = 0; for (const v of buf) pk = Math.max(pk, Math.abs(v));
       const ms = hist.reduce((a, b) => a + b, 0) / hist.length;
       setLive(prev => ({ lufs: -0.691 + 10 * Math.log10(ms + 1e-24) - monitorDb, peak: Math.max(linToDb(pk) - monitorDb, prev.peak - 0.3) }));
       raf = requestAnimationFrame(tick);
     }; raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf);
-  }, [playing, orig, monitorDb]);
+  }, [playing, exc, monitorDb]);
 
   const set = (fn: (p: Params) => Params) => setParams(p => p ? fn(structuredClone(p)) : p);
 
@@ -201,18 +253,18 @@ export default function StudioV1() {
 
   return <main className="ab-studio st">
     <header className="ab-header"><Wordmark href="/tools/audiobook" /><span className="ab-badge">SALTWAVES STUDIO · V1</span></header>
-    <div className="ab-heading"><div><p className="ab-eyebrow">MÄT · LEVERANSFIX · HELA KEDJAN</p><h1>Hör ändringen<span>.</span></h1></div><p>Ladda upp ett utdrag på 30–60 sekunder, justera och spara ett preset. Mastra sedan hela filen med samma inställningar. <a href="/tools/audiobook">← Tillbaka till Audiobook</a></p></div>
+    <div className="ab-heading"><div><p className="ab-eyebrow">MÄT · LEVERANSFIX · HELA KEDJAN</p><h1>Hör ändringen<span>.</span></h1></div><p>Ladda upp filen, välj ett utsnitt på 1–5 minuter och kör Full chain. Lyssna, välj klang och spara ett preset. Mastra sedan hela filen med samma inställningar. <a href="/tools/audiobook">← Tillbaka till Audiobook</a></p></div>
     <div className="st-specbar" role="group" aria-label="Leveransspec">{specs.map(s => <button key={s.id} className="ab-secondary" aria-pressed={s.id === specId} onClick={() => setSpecId(s.id)}>{s.label}</button>)}{spec?.note && <small>{spec.note}</small>}</div>
 
     <section className="ab-workspace">
       <div className="ab-filebar"><div><span className="ab-eyebrow">01 · LJUDFIL</span><h2>{file?.name || "Välj ett utdrag"}</h2></div><button className="ab-secondary" disabled={!!busy} onClick={() => input.current?.click()}>{file ? "Byt fil" : "Välj ljudfil"}</button></div>
       <input ref={input} hidden type="file" accept=".wav,.mp3,.m4a,.aif,.aiff,.flac" onChange={e => { if (e.target.files?.[0]) void choose(e.target.files[0]); e.target.value = ""; }} />
-      {!orig ? <div className="ab-drop" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) void choose(e.dataTransfer.files[0]); }}><div className="ab-drop-icon">↑</div><p>Dra din ljudfil hit</p><span>WAV, MP3, M4A, AIFF eller FLAC · 30–60 s räcker för att justera</span></div>
-        : <div className="st-player"><Waveform buffer={orig} position={pos} onSeek={t => { setPos(t); if (audioEl.current) audioEl.current.currentTime = t; if (playing) void playLive(t); }} /><audio ref={audioEl} src={origUrl} controls onTimeUpdate={e => { if (!playing) setPos(e.currentTarget.currentTime); }} /></div>}
+      {!orig ? <div className="ab-drop" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) void choose(e.dataTransfer.files[0]); }}><div className="ab-drop-icon">↑</div><p>Dra din ljudfil hit</p><span>WAV, MP3, M4A, AIFF eller FLAC · du väljer ett utsnitt på 1–5 min</span></div>
+        : <div className="st-player"><Waveform buffer={orig} position={playing && exc ? exc.start + pos : origPos} region={region} onRegion={setRegion} onSeek={t => { setOrigPos(t); playOrig(t); }} /><div className="st-transport st-origbar"><button className="ab-play" aria-label={origPlaying ? "Pausa original" : "Spela original"} onClick={() => origPlaying ? stopOrig() : playOrig(origPos)}>{origPlaying ? "Ⅱ" : "▶"}</button><small>{mmss(origPos)} / {mmss(orig.duration)}</small></div>{region && <p className="st-note">Utsnitt för Full chain: {mmss(region.start)}–{mmss(region.start + region.length)} ({f1(region.length / 60)} min). Klicka i vågformen för att lyssna därifrån, dra i det markerade området eller i kanterna för att flytta eller ändra längd (1–5 min).</p>}</div>}
       <div className="st-actions" aria-label="Bearbetning">
         <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doMeasure()}><b>1 · Measure</b><span>{delivery ? "Mäter den leveransfixade filen" : "Loudness, true peak, dynamik och brusgolv mot spec"}</span></button>
         <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doDelivery()}><b>2 · Delivery-fix</b><span>Bara nivå, toppar och limiter till spec</span></button>
-        <button className="ab-master" disabled={!file || !!busy} onClick={() => void doFull()}><b>3 · Full chain</b><span>Hela bearbetningskedjan, sedan justering</span></button>
+        <button className="ab-master" disabled={!file || !!busy} onClick={() => void doFull()}><b>3 · Full chain</b><span>Hela kedjan på det valda utsnittet (1–5 min), sedan studiovyn</span></button>
       </div>
       {busy && <p className="ab-status" role="status"><span className="ab-spinner" />{busy}</p>}
       {error && <p className="ab-error" role="alert">{error}</p>}
@@ -223,6 +275,7 @@ export default function StudioV1() {
     {versions && params && spec && <section className="st-adjust">
       <div className="st-adjust-head"><div><p className="ab-eyebrow">02 · LYSSNA OCH VÄLJ</p><h2>Din master</h2><p>Brusreducering, EQ, kompression, de-esser, limiter och nivå mot spec sätts automatiskt utifrån materialet. Du väljer klickborttagning, klang och leveransspec.</p></div>
         <div className="st-transport"><button className="ab-play" aria-label={playing ? "Pausa" : "Spela"} onClick={() => playing ? stopLive() : void playLive()}>{playing ? "Ⅱ" : "▶"}</button><div className="ab-switch" role="group" aria-label="A/B"><button aria-pressed={listen === "original"} onClick={() => setListen("original")}>A · Original</button><button aria-pressed={listen === "processed"} onClick={() => setListen("processed")}>B · Bearbetat</button></div><small>Nivåmatchat</small></div></div>
+      {exc && <div className="st-excerpt"><p className="st-note">Utsnitt {mmss(exc.start)}–{mmss(exc.start + exc.buffer.duration)}. Klicka var som helst för att spela A/B därifrån.</p><Waveform buffer={exc.buffer} position={pos} onSeek={t => { stopOrig(); setPos(t); void playLive(t); }} /></div>}
       <div className="st-choices">
         <div role="group" aria-label="Klickborttagning"><span>Klickborttagning</span>{([["av", "Av"], ["lag", "Låg"], ["hog", "Hög"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={declick === k} onClick={() => setDeclick(k)}>{l}</button>)}</div>
         {!internal && <div role="group" aria-label="Klang"><span>Klang</span>{([["varm", "Varm"], ["neutral", "Neutral"], ["ljus", "Ljus"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={klang === k} onClick={() => setKlang(k)}>{l}</button>)}</div>}
