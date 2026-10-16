@@ -7,7 +7,7 @@ import "./studio.css";
 
 const API = "/api/audiobook-studio";
 type Check = { id: string; label: string; value: number | string | null; unit: string; requirement: string; pass: boolean; required?: boolean };
-type Measure = { lufs: number | null; true_peak: number | null; lra: number | null; rms: number; sample_peak: number; noise_floor: number; checks: Check[]; pass: boolean; applied_gain_db?: number };
+type Measure = { lufs: number | null; true_peak: number | null; lra: number | null; rms: number; sample_peak: number; noise_floor: number; checks: Check[]; pass: boolean; applied_gain_db?: number; noise_expander?: { threshold_db: number; depth_db: number } | null; source?: "original" | "delivery" };
 type Versions = Record<string, { lufs: number | null; meta?: { prenorm_gain_db: number; input_lufs: number } }>;
 type Preset = { name: string; spec: string; params: Params; saved: number };
 const VERSION_KEYS = ["pre_d0", "pre_d1", "dfn_d0", "dfn_d1"] as const;
@@ -103,8 +103,8 @@ export default function StudioV1() {
     } catch (e) { setError((e as Error).message); } finally { setBusy(""); }
   };
 
-  const doMeasure = async () => { if (!file) return; setBusy("Mäter…"); setError(""); try { setMeasure(await api<Measure>(`${file.id}/measure?spec=${specId}`, { method: "POST" })); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
-  const doDelivery = async () => { if (!file) return; setBusy("Nivå, topp och limiter till spec…"); setError(""); try { const r = await api<{ measure: Measure; audio: string }>(`${file.id}/delivery-fix?spec=${specId}`, { method: "POST" }); setDelivery({ measure: r.measure, url: `${API}/${r.audio}?t=${Date.now()}` }); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
+  const doMeasure = async () => { if (!file) return; setBusy("Mäter…"); setError(""); try { setMeasure(await api<Measure>(`${file.id}/measure?spec=${specId}&source=${delivery ? "delivery" : "original"}`, { method: "POST" })); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
+  const doDelivery = async () => { if (!file) return; setDelivery(null); setMeasure(null); setBusy("Nivå, topp och limiter till spec…"); setError(""); try { const r = await api<{ measure: Measure; audio: string }>(`${file.id}/delivery-fix?spec=${specId}`, { method: "POST" }); setDelivery({ measure: r.measure, url: `${API}/${r.audio}?t=${Date.now()}` }); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
   const doFull = async () => {
     if (!file) return; stopLive(); setBusy("Normaliserar till −23 LUFS och kör brusreducering och klickborttagning…"); setError("");
     try {
@@ -202,14 +202,14 @@ export default function StudioV1() {
       {!orig ? <div className="ab-drop" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) void choose(e.dataTransfer.files[0]); }}><div className="ab-drop-icon">↑</div><p>Dra din ljudfil hit</p><span>WAV, MP3, M4A, AIFF eller FLAC · 30–60 s räcker för att justera</span></div>
         : <div className="st-player"><Waveform buffer={orig} position={pos} onSeek={t => { setPos(t); if (audioEl.current) audioEl.current.currentTime = t; if (playing) void playLive(t); }} /><audio ref={audioEl} src={origUrl} controls onTimeUpdate={e => { if (!playing) setPos(e.currentTarget.currentTime); }} /></div>}
       <div className="st-actions" aria-label="Bearbetning">
-        <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doMeasure()}><b>1 · Measure</b><span>Loudness, true peak, dynamik och brusgolv mot spec</span></button>
+        <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doMeasure()}><b>1 · Measure</b><span>{delivery ? "Mäter den leveransfixade filen" : "Loudness, true peak, dynamik och brusgolv mot spec"}</span></button>
         <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doDelivery()}><b>2 · Delivery-fix</b><span>Bara nivå, toppar och limiter till spec</span></button>
         <button className="ab-master" disabled={!file || !!busy} onClick={() => void doFull()}><b>3 · Full chain</b><span>Hela bearbetningskedjan, sedan justering</span></button>
       </div>
       {busy && <p className="ab-status" role="status"><span className="ab-spinner" />{busy}</p>}
       {error && <p className="ab-error" role="alert">{error}</p>}
-      {measure && <div className="st-panel"><h3>Mätning av originalet {measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">klarar inte specen</em>}</h3><Checks m={measure} /></div>}
-      {delivery && <div className="st-panel"><h3>Leveransfix {delivery.measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">utanför spec</em>}</h3><audio src={delivery.url} controls /><Checks m={delivery.measure} /><a className="ab-secondary" href={delivery.url} download>Ladda ner WAV</a></div>}
+      {measure && <div className="st-panel"><h3>{measure.source === "delivery" ? "Mätning efter leveransfix" : "Mätning av originalet"} {measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">klarar inte specen</em>}</h3><Checks m={measure} /></div>}
+      {delivery && <div className="st-panel"><h3>Mätning av leveransfixen {delivery.measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">utanför spec: {delivery.measure.checks.filter(c => c.required !== false && !c.pass).map(c => c.label).join(", ")}</em>}</h3><p className="st-note">Den fixade filen är mätt på nytt (44,1 kHz/16 bit efter dither). Nivå {delivery.measure.applied_gain_db !== undefined ? `${delivery.measure.applied_gain_db >= 0 ? "+" : ""}${f1(delivery.measure.applied_gain_db)} dB` : "—"}{delivery.measure.noise_expander ? `, pausexpander under ${f1(delivery.measure.noise_expander.threshold_db)} dBFS (max ${f1(delivery.measure.noise_expander.depth_db)} dB) för att hålla brusgolvet` : ""}.{!delivery.measure.pass ? " Prova Full chain för brusreducering." : ""}</p><audio src={delivery.url} controls /><Checks m={delivery.measure} /><a className="ab-secondary" href={delivery.url} download>Ladda ner WAV</a></div>}
     </section>
 
     {versions && params && spec && <section className="st-adjust">
