@@ -9,8 +9,12 @@ const API = "/api/audiobook-studio";
 type Check = { id: string; label: string; value: number | string | null; unit: string; requirement: string; pass: boolean; required?: boolean };
 type Measure = { lufs: number | null; true_peak: number | null; lra: number | null; rms: number; sample_peak: number; noise_floor: number; checks: Check[]; pass: boolean; applied_gain_db?: number; noise_expander?: { threshold_db: number; depth_db: number } | null; source?: "original" | "delivery" };
 type Versions = Record<string, { lufs: number | null; meta?: { prenorm_gain_db: number; input_lufs: number } }>;
-type Preset = { name: string; spec: string; params: Params; saved: number };
-const VERSION_KEYS = ["pre_d0", "pre_d1", "dfn_d0", "dfn_d1"] as const;
+type Declick = "av" | "lag" | "hog"; type Klang = "varm" | "neutral" | "ljus";
+type Preset = { name: string; label?: string; declick: Declick; klang: Klang; spec: string; saved: number };
+// Måste matcha KLANG i backend/studio_engine.py (saltwaves-audiobook).
+const KLANG: Record<Klang, { low: number; high: number }> = { varm: { low: 1.5, high: -1.5 }, neutral: { low: 0, high: 0 }, ljus: { low: -1, high: 2 } };
+const lockedParams = (k: Klang): Params => ({ hpf: 0, low: { f: 200, g: KLANG[k].low }, mid: { f: 1000, g: 0, q: 1 }, high: { f: 6000, g: KLANG[k].high }, comp: { on: false, threshold: -24, ratio: 2.5, attack: 10, release: 150, knee: 4 }, deess: { on: false, freq: 6000, threshold: -32, ratio: 4 }, limiter: { ceiling: -3.5 }, declick: false, dfn: true });
+const VERSION_KEYS = ["locked_av", "locked_lag", "locked_hog"] as const;
 const f1 = (v: number | null | undefined, d = 1) => (v === null || v === undefined || !Number.isFinite(v) ? "—" : v.toFixed(d).replace("-", "−"));
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -78,7 +82,10 @@ export default function StudioV1() {
   const [prediction, setPrediction] = useState<{ autoGainDb: number; level: number; truePeak: number } | null>(null);
   const [live, setLive] = useState({ lufs: -Infinity, peak: -Infinity });
   const [monitorDb, setMonitorDb] = useState(0);
-  const [presets, setPresets] = useState<Preset[]>([]); const [presetName, setPresetName] = useState("");
+  const [presets, setPresets] = useState<Preset[]>([]); const [presetName, setPresetName] = useState(""); const [presetLabel, setPresetLabel] = useState("");
+  const [declick, setDeclick] = useState<Declick>("av"); const [klang, setKlang] = useState<Klang>("neutral");
+  // Internt läge (fria reglage) bara för Saltwaves: ?internal=1 eller NEXT_PUBLIC_STUDIO_INTERNAL=true. Avstängt som standard.
+  const [internal] = useState(() => process.env.NEXT_PUBLIC_STUDIO_INTERNAL === "true" || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("internal") === "1"));
   const [masterState, setMasterState] = useState<{ progress?: string; state?: string; result?: Measure; audio?: string; error?: string } | null>(null);
   const input = useRef<HTMLInputElement>(null); const fullInput = useRef<HTMLInputElement>(null);
   const audioEl = useRef<HTMLAudioElement>(null);
@@ -106,43 +113,44 @@ export default function StudioV1() {
   const doMeasure = async () => { if (!file) return; setBusy("Mäter…"); setError(""); try { setMeasure(await api<Measure>(`${file.id}/measure?spec=${specId}&source=${delivery ? "delivery" : "original"}`, { method: "POST" })); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
   const doDelivery = async () => { if (!file) return; setDelivery(null); setMeasure(null); setBusy("Nivå, topp och limiter till spec…"); setError(""); try { const r = await api<{ measure: Measure; audio: string }>(`${file.id}/delivery-fix?spec=${specId}`, { method: "POST" }); setDelivery({ measure: r.measure, url: `${API}/${r.audio}?t=${Date.now()}` }); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
   const doFull = async () => {
-    if (!file) return; stopLive(); setBusy("Normaliserar till −23 LUFS och kör brusreducering och klickborttagning…"); setError("");
+    if (!file) return; stopLive(); setBusy("Kör hela bearbetningskedjan på utdraget…"); setError("");
     try {
-      const r = await api<{ versions: Versions }>(`${file.id}/full-chain`, { method: "POST" });
+      const r = await api<{ versions: Versions }>(`${file.id}/full-chain?spec=${specId}`, { method: "POST" });
       const ctx = new OfflineAudioContext(1, 1, 48000); const out: Record<string, AudioBuffer> = {};
       await Promise.all(VERSION_KEYS.map(async k => { out[k] = await decode(`${API}/${file.id}/audio/${k}`, ctx); }));
       setBuffers(out); setVersions(r.versions);
     } catch (e) { setError((e as Error).message); } finally { setBusy(""); }
   };
 
-  const current = params ? `${params.dfn ? "dfn" : "pre"}_d${params.declick ? 1 : 0}` : "dfn_d0";
+  const current = `locked_${declick}`;
+  const chainParams = internal ? params : lockedParams(klang);
 
   // Förutsäg mastern (offline, samma kedja) när inställningar ändras.
   useEffect(() => {
-    if (!params || !spec || !buffers[current]) return;
-    let cancel = false; const t = setTimeout(async () => { const p = await predict(buffers[current], params, spec); if (!cancel) setPrediction(p); }, 350);
+    if (!chainParams || !spec || !buffers[current]) return;
+    let cancel = false; const t = setTimeout(async () => { const p = await predict(buffers[current], chainParams, spec); if (!cancel) setPrediction(p); }, 350);
     return () => { cancel = true; clearTimeout(t); };
-  }, [params, spec, buffers, current]);
+  }, [chainParams, spec, buffers, current]);
 
   // Uppdatera live-kedjan direkt.
   useEffect(() => {
-    const L = live$.current; if (!L || !params) return;
-    L.chain.update(params, prediction?.autoGainDb ?? 0);
+    const L = live$.current; if (!L || !chainParams) return;
+    L.chain.update(chainParams, prediction?.autoGainDb ?? 0);
     const t = L.ctx.currentTime;
     for (const k of VERSION_KEYS) L.vg[k].gain.setTargetAtTime(k === current ? 1 : 0, t, 0.01);
     L.wet.gain.setTargetAtTime(listen === "processed" ? 1 : 0, t, 0.01);
     const origLufs = versions?.original.lufs ?? -23;
     L.og.gain.setTargetAtTime(listen === "original" ? dbToLin(Math.min(20, (spec?.metric === "lufs" ? spec.target : (prediction?.level ?? -20)) - origLufs)) : 0, t, 0.01);
     L.mon.gain.setTargetAtTime(dbToLin(monitorDb), t, 0.01);
-  }, [params, prediction, current, listen, versions, spec, monitorDb]);
+  }, [chainParams, prediction, current, listen, versions, spec, monitorDb]);
 
   const stopLive = useCallback(() => { const L = live$.current; if (L) { L.srcs.forEach(s => { try { s.stop(); } catch { /* */ } }); L.ctx.close(); live$.current = null; } setPlaying(false); }, []);
 
   const playLive = async (from = pos) => {
-    if (!params || !orig || !buffers[current]) return;
+    if (!chainParams || !orig || !buffers[current]) return;
     stopLive();
     const ctx = new AudioContext({ sampleRate: 48000 }); await loadLimiter(ctx);
-    const chain = buildChain(ctx, params, prediction?.autoGainDb ?? 0, true);
+    const chain = buildChain(ctx, chainParams, prediction?.autoGainDb ?? 0, true);
     const meterIn = ctx.createGain(), mon = ctx.createGain(), wet = ctx.createGain(), og = ctx.createGain();
     chain.output.connect(wet).connect(meterIn); og.connect(meterIn); meterIn.connect(mon).connect(ctx.destination);
     const k1 = ctx.createBiquadFilter(); k1.type = "highshelf"; k1.frequency.value = 1682; k1.gain.value = 4;
@@ -158,6 +166,7 @@ export default function StudioV1() {
     setPlaying(true); setListen(l => l);
     setParams(p => p ? { ...p } : p);
   };
+  useEffect(() => { if (live$.current && playing) live$.current.chain.update(lockedParams(klang), prediction?.autoGainDb ?? 0); }, [klang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mätare
   useEffect(() => {
@@ -175,13 +184,13 @@ export default function StudioV1() {
 
   const set = (fn: (p: Params) => Params) => setParams(p => p ? fn(structuredClone(p)) : p);
 
-  const savePreset = async () => { if (!params || !presetName.trim()) return; try { await api("presets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: presetName.trim(), spec: specId, params }) }); setPresets((await api<{ presets: Preset[] }>("presets")).presets); } catch (e) { setError((e as Error).message); } };
+  const savePreset = async () => { if (!params || !presetName.trim()) return; try { await api("presets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: presetName.trim(), label: presetLabel.trim(), declick, klang, spec: specId }) }); setPresets((await api<{ presets: Preset[] }>("presets")).presets); } catch (e) { setError((e as Error).message); } };
 
   const masterFile = async (target: { id: string } | null, f?: File) => {
     if (!params) return; setError(""); setMasterState({ progress: "Laddar upp hela filen…", state: "running" });
     try {
       const id = f ? (await uploadFile(f)).id : target!.id;
-      const { job } = await api<{ job: string }>(`${id}/master?spec=${specId}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ params }) });
+      const { job } = await api<{ job: string }>(`${id}/master?spec=${specId}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ declick, klang, spec: specId, ...(internal ? { internal_params: params } : {}) }) });
       for (;;) { await new Promise(r => setTimeout(r, 1500)); const s = await api<{ state: string; progress: string; result?: Measure; audio?: string; error?: string }>(`jobs/${job}`); setMasterState(s); if (s.state !== "running") break; }
     } catch (e) { setMasterState({ state: "failed", error: (e as Error).message }); }
   };
@@ -189,7 +198,6 @@ export default function StudioV1() {
   const ok = (v: number | null | undefined, lo: number, hi: number) => v !== null && v !== undefined && v >= lo && v <= hi;
   const levelOk = spec && prediction ? (spec.metric === "lufs" ? ok(prediction.level, spec.target - (spec.tolerance ?? 0.5), spec.target + (spec.tolerance ?? 0.5)) : ok(prediction.level, spec.range![0], spec.range![1])) : false;
   const tpOk = spec && prediction ? prediction.truePeak <= spec.peak_max : false;
-  const liveLevelOk = spec ? Math.abs(live.lufs - (spec.metric === "lufs" ? spec.target : -20)) <= 2 : false;
 
   return <main className="ab-studio st">
     <header className="ab-header"><Wordmark href="/tools/audiobook" /><span className="ab-badge">SALTWAVES STUDIO · V1</span></header>
@@ -213,55 +221,38 @@ export default function StudioV1() {
     </section>
 
     {versions && params && spec && <section className="st-adjust">
-      <div className="st-adjust-head"><div><p className="ab-eyebrow">02 · JUSTERA I REALTID</p><h2>Justera kedjan</h2><p>Brusreducering och klickborttagning är färdigrenderade på servern och växlas direkt. EQ, kompressor, de-esser och limiter körs live i webbläsaren med samma parametrar som mastringen.</p></div>
-        <div className="st-transport"><button className="ab-play" onClick={() => playing ? stopLive() : void playLive()}>{playing ? "Ⅱ" : "▶"}</button><div className="ab-switch" role="group" aria-label="A/B"><button aria-pressed={listen === "original"} onClick={() => setListen("original")}>A · Original</button><button aria-pressed={listen === "processed"} onClick={() => setListen("processed")}>B · Bearbetat</button></div><small>Nivåmatchat mot målnivån</small></div></div>
-      <div className="st-meters">
-        <div className={liveLevelOk ? "st-ok" : "st-bad"}><span>Live loudness (≈3 s)</span><b>{f1(live.lufs)} LUFS</b></div>
-        <div className={live.peak <= spec.peak_max ? "st-ok" : "st-bad"}><span>Live topp</span><b>{f1(live.peak)} dB</b></div>
-        <div className={levelOk ? "st-ok" : "st-bad"}><span>Förväntad master, {spec.metric === "lufs" ? "integrerad" : "RMS"}</span><b>{prediction ? f1(prediction.level) : "…"} {spec.metric === "lufs" ? "LUFS" : "dBFS"}</b></div>
-        <div className={tpOk ? "st-ok" : "st-bad"}><span>Förväntad true peak</span><b>{prediction ? f1(prediction.truePeak) : "…"} dBTP</b></div>
+      <div className="st-adjust-head"><div><p className="ab-eyebrow">02 · LYSSNA OCH VÄLJ</p><h2>Din master</h2><p>Brusreducering, EQ, kompression, de-esser, limiter och nivå mot spec sätts automatiskt utifrån materialet. Du väljer klickborttagning, klang och leveransspec.</p></div>
+        <div className="st-transport"><button className="ab-play" aria-label={playing ? "Pausa" : "Spela"} onClick={() => playing ? stopLive() : void playLive()}>{playing ? "Ⅱ" : "▶"}</button><div className="ab-switch" role="group" aria-label="A/B"><button aria-pressed={listen === "original"} onClick={() => setListen("original")}>A · Original</button><button aria-pressed={listen === "processed"} onClick={() => setListen("processed")}>B · Bearbetat</button></div><small>Nivåmatchat</small></div></div>
+      <div className="st-choices">
+        <div role="group" aria-label="Klickborttagning"><span>Klickborttagning</span>{([["av", "Av"], ["lag", "Låg"], ["hog", "Hög"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={declick === k} onClick={() => setDeclick(k)}>{l}</button>)}</div>
+        {!internal && <div role="group" aria-label="Klang"><span>Klang</span>{([["varm", "Varm"], ["neutral", "Neutral"], ["ljus", "Ljus"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={klang === k} onClick={() => setKlang(k)}>{l}</button>)}</div>}
+        <div role="group" aria-label="Spec"><span>Spec</span>{specs.map(s => <button key={s.id} className="ab-secondary" aria-pressed={s.id === specId} onClick={() => setSpecId(s.id)}>{s.id === "acx" ? "ACX" : "Storytel"}</button>)}</div>
       </div>
-      <div className="st-toggles">
-        <label><input type="checkbox" checked={params.dfn} onChange={e => set(p => ({ ...p, dfn: e.target.checked }))} /> Brusreducering (100 %)</label>
-        <label><input type="checkbox" checked={params.declick} onChange={e => set(p => ({ ...p, declick: e.target.checked }))} /> Klickborttagning</label>
-        <label><input type="checkbox" checked={params.comp.on} onChange={e => set(p => { p.comp.on = e.target.checked; return p; })} /> Kompressor</label>
-        <label><input type="checkbox" checked={params.deess.on} onChange={e => set(p => { p.deess.on = e.target.checked; return p; })} /> De-esser</label>
-        <small>Prenorm före brusreducering: {f1(versions[current]?.meta?.prenorm_gain_db)} dB → −23 LUFS</small>
+      <div className="st-meters st-meters-2">
+        <div className={levelOk ? "st-ok" : "st-bad"}><span>Förväntad master, {spec.metric === "lufs" ? "integrerad" : "RMS"}</span><b>{prediction ? f1(prediction.level) : "…"} {spec.metric === "lufs" ? "LUFS" : "dBFS"}</b><small>Krav {spec.metric === "lufs" ? `${f1(spec.target)} ± ${spec.tolerance}` : `${spec.range![0]} till ${spec.range![1]}`}</small></div>
+        <div className={tpOk ? "st-ok" : "st-bad"}><span>Förväntad true peak</span><b>{prediction ? f1(prediction.truePeak) : "…"} dBTP</b><small>Krav ≤ {f1(spec.peak_max)}</small></div>
       </div>
-      <div className="st-grid">
+      {internal && <div className="st-grid"><p className="st-note">Internt läge: fria reglage ovanpå den automatiska kedjan (ersätter klang).</p>
         <div className="st-box"><h3>EQ</h3><EqCurve p={params} />
           <Slider label="Högpass" value={params.hpf} min={0} max={200} step={5} unit="Hz" onChange={v => set(p => ({ ...p, hpf: v }))} />
-          <Slider label="Bas, frekvens" value={params.low.f} min={60} max={400} step={10} unit="Hz" onChange={v => set(p => { p.low.f = v; return p; })} />
           <Slider label="Bas, nivå" value={params.low.g} min={-12} max={12} step={0.5} unit="dB" onChange={v => set(p => { p.low.g = v; return p; })} />
           <Slider label="Mellan, frekvens" value={params.mid.f} min={300} max={6000} step={50} unit="Hz" onChange={v => set(p => { p.mid.f = v; return p; })} />
           <Slider label="Mellan, nivå" value={params.mid.g} min={-12} max={12} step={0.5} unit="dB" onChange={v => set(p => { p.mid.g = v; return p; })} />
-          <Slider label="Mellan, Q" value={params.mid.q} min={0.3} max={6} step={0.1} unit="" onChange={v => set(p => { p.mid.q = v; return p; })} />
-          <Slider label="Diskant, frekvens" value={params.high.f} min={3000} max={14000} step={100} unit="Hz" onChange={v => set(p => { p.high.f = v; return p; })} />
-          <Slider label="Diskant, nivå" value={params.high.g} min={-12} max={12} step={0.5} unit="dB" onChange={v => set(p => { p.high.g = v; return p; })} />
-        </div>
-        <div className="st-box"><h3>Kompressor</h3>
+          <Slider label="Diskant, nivå" value={params.high.g} min={-12} max={12} step={0.5} unit="dB" onChange={v => set(p => { p.high.g = v; return p; })} /></div>
+        <div className="st-box"><h3>Dynamik</h3>
+          <label><input type="checkbox" checked={params.comp.on} onChange={e => set(p => { p.comp.on = e.target.checked; return p; })} /> Kompressor</label>
           <Slider label="Tröskel" value={params.comp.threshold} min={-50} max={0} step={1} unit="dB" onChange={v => set(p => { p.comp.threshold = v; return p; })} />
           <Slider label="Ratio" value={params.comp.ratio} min={1} max={10} step={0.5} unit=":1" onChange={v => set(p => { p.comp.ratio = v; return p; })} />
-          <Slider label="Attack" value={params.comp.attack} min={1} max={100} step={1} unit="ms" onChange={v => set(p => { p.comp.attack = v; return p; })} />
-          <Slider label="Release" value={params.comp.release} min={20} max={1000} step={10} unit="ms" onChange={v => set(p => { p.comp.release = v; return p; })} />
-          <Slider label="Knä" value={params.comp.knee} min={1} max={8} step={0.5} unit="dB" onChange={v => set(p => { p.comp.knee = v; return p; })} />
-          <h3>De-esser</h3>
-          <Slider label="Frekvens" value={params.deess.freq} min={3000} max={10000} step={100} unit="Hz" onChange={v => set(p => { p.deess.freq = v; return p; })} />
-          <Slider label="Tröskel" value={params.deess.threshold} min={-60} max={0} step={1} unit="dB" onChange={v => set(p => { p.deess.threshold = v; return p; })} />
-          <Slider label="Ratio" value={params.deess.ratio} min={1} max={10} step={0.5} unit=":1" onChange={v => set(p => { p.deess.ratio = v; return p; })} />
-        </div>
-        <div className="st-box"><h3>Limiter och nivå</h3>
+          <label><input type="checkbox" checked={params.deess.on} onChange={e => set(p => { p.deess.on = e.target.checked; return p; })} /> De-esser</label>
+          <Slider label="De-ess tröskel" value={params.deess.threshold} min={-60} max={0} step={1} unit="dB" onChange={v => set(p => { p.deess.threshold = v; return p; })} />
           <Slider label="Limitertak" value={params.limiter.ceiling} min={-6} max={-3.3} step={0.1} unit="dB" onChange={v => set(p => { p.limiter.ceiling = v; return p; })} />
-          <p className="st-note">Nivån sätts automatiskt till {spec.label} ({spec.metric === "lufs" ? `${f1(spec.target)} LUFS` : "RMS −20 dBFS"}). Just nu {prediction ? `${prediction.autoGainDb >= 0 ? "+" : ""}${f1(prediction.autoGainDb)} dB` : "…"}.</p>
-          <Slider label="Lyssningsvolym" value={monitorDb} min={-20} max={6} step={0.5} unit="dB" onChange={setMonitorDb} />
-          <p className="st-note">Lyssningsvolymen påverkar bara uppspelningen här, inte mastern.</p>
-          <h3>Presets</h3>
-          <div className="st-preset"><input placeholder="Namn, t.ex. inläsare eller bok" value={presetName} onChange={e => setPresetName(e.target.value)} /><button className="ab-secondary" disabled={!presetName.trim()} onClick={() => void savePreset()}>Spara</button></div>
-          <ul className="st-presets">{presets.map(p => <li key={p.name}><button className="ab-secondary" onClick={() => { setParams(p.params); setSpecId(p.spec); setPresetName(p.name); }}>{p.name}</button></li>)}</ul>
-        </div>
+          <Slider label="Lyssningsvolym" value={monitorDb} min={-20} max={6} step={0.5} unit="dB" onChange={setMonitorDb} /></div></div>}
+      <div className="st-panel"><h3>Presets</h3>
+        <div className="st-preset"><input placeholder="Namn" value={presetName} onChange={e => setPresetName(e.target.value)} /><input placeholder="Inläsare eller bok (valfritt)" value={presetLabel} onChange={e => setPresetLabel(e.target.value)} /><button className="ab-secondary" disabled={!presetName.trim()} onClick={() => void savePreset()}>Spara</button></div>
+        <ul className="st-presets">{presets.map(p => <li key={p.name}><button className="ab-secondary" title={`${p.label || ""} ${p.declick}/${p.klang}/${p.spec}`} onClick={() => { setDeclick(p.declick); setKlang(p.klang); setSpecId(p.spec); setPresetName(p.name); setPresetLabel(p.label || ""); }}>{p.name}{p.label ? ` · ${p.label}` : ""}</button></li>)}</ul>
       </div>
-      <div className="st-panel"><p className="ab-eyebrow">03 · MASTRA HELA FILEN</p><p>Samma inställningar körs på servern: klickborttagning, normalisering till −23 LUFS, brusreducering, EQ, kompressor, de-esser, nivå till spec och limiter. Exporten blir 44,1 kHz, 16 bit mono med dither.</p>
-        <div className="st-row"><button className="ab-master" disabled={masterState?.state === "running"} onClick={() => fullInput.current?.click()}>Välj hela filen och mastra</button><button className="ab-secondary" disabled={masterState?.state === "running"} onClick={() => void masterFile(file)}>Mastra det här utdraget</button></div>
+      <div className="st-panel"><p className="ab-eyebrow">03 · MASTRA HELA FILEN</p><p>Samma automatiska kedja och dina val körs på hela filen. Exporten blir 44,1 kHz, 16 bit mono med dither.</p>
+        <div className="st-row"><button className="ab-master" disabled={masterState?.state === "running"} onClick={() => fullInput.current?.click()}>Välj hela filen och mastra</button><button className="ab-secondary" disabled={masterState?.state === "running"} onClick={() => void masterFile(file)}>Mastra den här filen</button></div>
         <input ref={fullInput} hidden type="file" accept=".wav,.mp3,.m4a,.aif,.aiff,.flac" onChange={e => { if (e.target.files?.[0]) void masterFile(null, e.target.files[0]); e.target.value = ""; }} />
         {masterState?.state === "running" && <p className="ab-status"><span className="ab-spinner" />{masterState.progress}</p>}
         {masterState?.state === "failed" && <p className="ab-error">{masterState.error}</p>}
