@@ -14,12 +14,18 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
   }
   const { path } = await ctx.params;
   const url = `${api}/${path.map(encodeURIComponent).join("/")}${req.nextUrl.search}`;
-  const init: RequestInit & { duplex?: "half" } = { method: req.method, headers: { "content-type": req.headers.get("content-type") || "application/octet-stream" } };
+  const headers: Record<string, string> = { "content-type": req.headers.get("content-type") || "application/octet-stream" };
+  // Cloudflare Access service token (endast server-side, exponeras aldrig för webbläsaren).
+  if (process.env.AUDIOBOOK_STUDIO_CF_ACCESS_CLIENT_ID && process.env.AUDIOBOOK_STUDIO_CF_ACCESS_CLIENT_SECRET) {
+    headers["CF-Access-Client-Id"] = process.env.AUDIOBOOK_STUDIO_CF_ACCESS_CLIENT_ID;
+    headers["CF-Access-Client-Secret"] = process.env.AUDIOBOOK_STUDIO_CF_ACCESS_CLIENT_SECRET;
+  }
+  const init: RequestInit & { duplex?: "half" } = { method: req.method, headers, redirect: "manual" };
   if (req.method !== "GET" && req.method !== "HEAD") { init.body = req.body; init.duplex = "half"; }
   const res = await fetch(url, init);
-  const headers = new Headers();
-  for (const h of ["content-type", "content-length", "content-disposition"]) { const v = res.headers.get(h); if (v) headers.set(h, v); }
-  return new Response(res.body, { status: res.status, headers });
+  const out = new Headers();
+  for (const h of ["content-type", "content-length", "content-disposition"]) { const v = res.headers.get(h); if (v) out.set(h, v); }
+  return new Response(res.body, { status: res.status, headers: out });
 }
 export const GET = forward;
 export const POST = forward;
