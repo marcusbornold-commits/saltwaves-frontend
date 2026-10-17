@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Wordmark } from "../../../components/saltwaves-ui";
 import { buildChain, loadLimiter, predict, dbToLin, linToDb, type Chain, type Params, type Spec } from "@/lib/studio-chain";
+import { studioTusUpload } from "@/lib/studio-upload";
 import "../audiobook.css";
 import "./studio.css";
 
@@ -148,9 +149,13 @@ export default function StudioV1() {
 
   useEffect(() => { api<{ spec: Spec; defaults: Params }>("specs").then(r => { setSpec(r.spec); setParams(r.defaults); }).catch(e => setError(`Studiotjänsten svarar inte: ${e.message}`)); api<{ presets: Preset[] }>("presets").then(r => setPresets(r.presets)).catch(() => {}); }, []);
 
-  const uploadFile = async (f: File) => {
+  // Via preview-länken (https) går ljudet med tus direkt till lagringen, förbi Cloudflares 100 MB-gräns.
+  // Lokalt och över Tailscale (http) används den direkta /upload som tidigare. ?tus=1 tvingar tus.
+  const useTus = () => typeof window !== "undefined" && window.isSecureContext && (new URLSearchParams(location.search).get("tus") === "1" || !["localhost", "127.0.0.1"].includes(location.hostname));
+  const uploadFile = async (f: File, onPct: (pct: number) => void = () => {}) => {
+    if (useTus()) return studioTusUpload(f, API, (sent, total) => onPct(Math.floor(sent / total * 100)));
     const r = await fetch(`${API}/upload?filename=${encodeURIComponent(f.name)}`, { method: "POST", body: f, headers: { "content-type": "application/octet-stream" } });
-    if (r.status === 413) throw new Error("Filen är större än 100 MB. Det klarar preview-länken inte ännu. Prova en kortare fil eller använd studion lokalt.");
+    if (r.status === 413) throw new Error("Filen är större än 1000 MB.");
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "Uppladdningen misslyckades");
     return r.json() as Promise<{ id: string; duration: number; filename: string }>;
   };
@@ -159,7 +164,7 @@ export default function StudioV1() {
     stopLive(); stopOrig(); setError(""); setMeasure(null); setDelivery(null); setVersions(null); setBuffers({}); setExc(null); setMasterState(null); setPrediction(null);
     setBusy("Laddar upp och läser in…");
     try {
-      const up = await uploadFile(f); setFile({ id: up.id, name: up.filename });
+      const up = await uploadFile(f, pct => setBusy(`Laddar upp… ${pct} %`)); setBusy("Läser in och mäter…"); setFile({ id: up.id, name: up.filename });
       const url = `${API}/${up.id}/audio/original`; setOrigUrl(url);
       const b = await decode(url, new OfflineAudioContext(1, 1, 48000)); setOrig(b); setRegion(fitRegion(0, DEFAULT_REGION, b.duration)); setPos(0); setOrigPos(0);
     } catch (e) { setError((e as Error).message); } finally { setBusy(""); }
@@ -252,7 +257,7 @@ export default function StudioV1() {
   const masterFile = async (target: { id: string } | null, f?: File) => {
     if (!params) return; if (!mic) { setMasterState({ state: "failed", error: "Välj mikrofontyp först." }); return; } setError(""); setMasterState({ progress: "Laddar upp hela filen…", state: "running" });
     try {
-      const id = f ? (await uploadFile(f)).id : target!.id;
+      const id = f ? (await uploadFile(f, pct => setMasterState({ progress: `Laddar upp hela filen… ${pct} %`, state: "running" }))).id : target!.id;
       const { job } = await api<{ job: string }>(`${id}/master`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ declick, klang, mic, ...(internal ? { internal_params: params } : {}) }) });
       for (;;) { await new Promise(r => setTimeout(r, 1500)); const s = await api<{ state: string; progress: string; result?: Measure; audio?: string; error?: string }>(`jobs/${job}`); setMasterState(s); if (s.state !== "running") break; }
     } catch (e) { setMasterState({ state: "failed", error: (e as Error).message }); }
