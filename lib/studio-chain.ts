@@ -11,7 +11,7 @@ export type Params = {
   declick: boolean;
   dfn: boolean;
 };
-export type Spec = { id: string; label: string; metric: "lufs" | "rms"; target: number; tolerance?: number; range?: [number, number]; peak_kind: "tp" | "sample"; peak_max: number; noise_max: number; note?: string };
+export type Spec = { id: string; label: string; metric: "lufs" | "rms"; target: number; tolerance?: number; range?: [number, number]; peak_kind: "tp" | "sample"; peak_max: number; noise_max: number; note?: string; source?: string };
 
 const BUTTERWORTH_DB = -3.0103; // Web Audio: Q för low/highpass anges i dB
 const PREDELAY = 0.006; // DynamicsCompressor lookahead i Chrome/Safari
@@ -117,24 +117,70 @@ export function integratedLufs(x: Float32Array, sr: number) {
 export function rmsDb(x: Float32Array) { let e = 0; for (let i = 0; i < x.length; i++) e += x[i] * x[i]; return 10 * Math.log10(e / x.length + 1e-24); }
 export function peakDb(x: Float32Array) { let p = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > p) p = a; } return linToDb(p); }
 
-/** Förutsäger mastern: rendera kedjan offline, sätt nivå till spec, rendera igen med limiter i 192 kHz (≈ true peak). */
+// Pausexpander, variant B. Måste matcha PAUSE_EXPANDER + pause_expander() i backend/studio_engine.py.
+export const PAUSE_EXPANDER = { block_ms: 1, det_ms: 10, hp_hz: 120, open_db: -48, close_db: -55, hold_ms: 60, lookahead_ms: 10, floor_db: -87, range_db: 30, level_ms: 60, attack_ms: 3, release_ms: 150 };
+function hp2(x: Float32Array, sr: number, f: number) {
+  // 2:a ordningens Butterworth-högpass, framåt och bakåt (som sosfiltfilt) för sidokedjan
+  const w = Math.tan(Math.PI * f / sr), k = 1 / (1 + Math.SQRT2 * w + w * w);
+  const b = [k, -2 * k, k], a = [1, 2 * (w * w - 1) * k, (1 - Math.SQRT2 * w + w * w) * k];
+  const run = (v: Float32Array) => biquad(v, b, a);
+  return run(run(x).reverse()).reverse();
+}
+export function pauseExpander(x: Float32Array, sr: number, p = PAUSE_EXPANDER): Float32Array {
+  const blk = Math.round(sr * p.block_ms / 1000), nb = Math.floor(x.length / blk) + 1;
+  const sc = hp2(x, sr, p.hp_hz); const e = new Float64Array(nb), ef = new Float64Array(nb);
+  for (let i = 0; i < x.length; i++) { const j = (i / blk) | 0; e[j] += sc[i] * sc[i] / blk; ef[j] += x[i] * x[i] / blk; }
+  const smooth = (v: Float64Array, ms: number) => { const n = Math.max(1, Math.round(ms / p.block_ms)), o = new Float64Array(nb), c = new Float64Array(nb + 1); for (let i = 0; i < nb; i++) c[i + 1] = c[i] + v[i]; const h = Math.floor(n / 2); for (let i = 0; i < nb; i++) { const lo = i - (n - 1 - h) , hi = i + h; o[i] = (c[Math.min(nb, Math.max(0, hi + 1))] - c[Math.max(0, Math.min(nb, lo))]) / n; } return o; };
+  const ds = smooth(e, p.det_ms), ls = smooth(ef, p.level_ms);
+  const la = Math.round(p.lookahead_ms / p.block_ms), hold = Math.round(p.hold_ms / p.block_ms);
+  const g = new Float32Array(nb); let open = true, cnt = 0, cur = 0;
+  const aUp = Math.exp(-p.block_ms / p.attack_ms), aDn = Math.exp(-p.block_ms / p.release_ms);
+  for (let i = 0; i < nb; i++) {
+    const det = 10 * Math.log10(ds[Math.min(nb - 1, i + la)] + 1e-20), lvl = 10 * Math.log10(ls[i] + 1e-20);
+    if (det > p.open_db) { open = true; cnt = hold; } else if (det < p.close_db) { if (cnt > 0) cnt--; else open = false; } else if (open) cnt = hold;
+    const t = open ? 0 : -Math.min(p.range_db, Math.max(0, lvl - p.floor_db));
+    const c = t > cur ? aUp : aDn; cur = c * cur + (1 - c) * t; g[i] = cur;
+  }
+  const y = new Float32Array(x.length);
+  for (let i = 0; i < x.length; i++) { const f = i / blk - 0.5, j = Math.max(0, Math.min(nb - 2, Math.floor(f))), u = Math.max(0, Math.min(1, f - j)); y[i] = x[i] * Math.pow(10, (g[j] * (1 - u) + g[j + 1] * u) / 20); }
+  return y;
+}
+/** Brus i pauser, samma metod som backend pause_stats(): 20 ms RMS, 10 ms hopp, tyst = under p95 − 35 dB, sjok ≥ 250 ms, 50 ms marginal. */
+export function pauseMedian(x: Float32Array, sr: number): number | null {
+  const w = Math.round(0.02 * sr), h = Math.round(0.01 * sr); if (x.length < w) return null;
+  const n = 1 + Math.floor((x.length - w) / h), db = new Float64Array(n);
+  for (let k = 0; k < n; k++) { let e = 0; for (let i = k * h; i < k * h + w; i++) e += x[i] * x[i]; db[k] = 20 * Math.log10(Math.max(Math.sqrt(e / w), 1e-12)); }
+  const sorted = Array.from(db).sort((a, b) => a - b); const p95 = sorted[Math.floor(0.95 * (n - 1))];
+  const vals: number[] = []; let i = 0;
+  while (i < n) { if (db[i] < p95 - 35) { let j = i; while (j < n && db[j] < p95 - 35) j++; if (j - i >= 25) for (let k = i + 5; k < j - 5; k++) vals.push(db[k]); i = j; } else i++; }
+  if (!vals.length) return null; vals.sort((a, b) => a - b); const m = vals.length >> 1;
+  return vals.length % 2 ? vals[m] : (vals[m - 1] + vals[m]) / 2;
+}
+
+/** Förutsäger mastern som servern gör den: kedja -> nivå -> pausexpander -> limiter i 192 kHz (≈ true peak). */
 export async function predict(buffer: AudioBuffer, p: Params, spec: Spec) {
   const sr = buffer.sampleRate;
-  const pass1 = new OfflineAudioContext(1, buffer.length, sr);
-  const s1 = pass1.createBufferSource(); s1.buffer = buffer;
-  const c1 = buildChain(pass1, p, 0, false); s1.connect(c1.input); c1.output.connect(pass1.destination); s1.start();
-  const r1 = (await pass1.startRendering()).getChannelData(0);
-  const level1 = spec.metric === "lufs" ? integratedLufs(r1, sr) : rmsDb(r1);
-  let gain = spec.target - level1;
+  const render = async (gainDb: number) => {
+    const c0 = new OfflineAudioContext(1, buffer.length, sr); const s0 = c0.createBufferSource(); s0.buffer = buffer;
+    const ch = buildChain(c0, p, gainDb, false); s0.connect(ch.input); ch.output.connect(c0.destination); s0.start();
+    return (await c0.startRendering()).getChannelData(0);
+  };
+  const r1 = await render(0);
+  let gain = spec.target - integratedLufs(r1, sr);
   const hi = 192000, len = Math.ceil(buffer.length * hi / sr);
-  let out: Float32Array = new Float32Array(0), level = level1;
-  for (let it = 0; it < 2; it++) {
-    const ctx = new OfflineAudioContext(1, len, hi); await loadLimiter(ctx);
-    const s = ctx.createBufferSource(); s.buffer = buffer;
-    const c = buildChain(ctx, p, gain, true); s.connect(c.input); c.output.connect(ctx.destination); s.start();
+  let out: Float32Array = new Float32Array(0), level = -Infinity, noise: number | null = null;
+  for (let it = 0; it < 3; it++) {
+    const ex = pauseExpander(await render(gain), sr); noise = pauseMedian(ex, sr);
+    const ctx = new OfflineAudioContext(1, len, hi); const worklet = await loadLimiter(ctx);
+    const b = ctx.createBuffer(1, ex.length, sr); b.copyToChannel(ex as Float32Array<ArrayBuffer>, 0);
+    const s = ctx.createBufferSource(); s.buffer = b; const ceil = Math.min(p.limiter.ceiling, -3.3);
+    let lim: AudioNode;
+    if (worklet) { const n = new AudioWorkletNode(ctx, "sw-limiter"); n.parameters.get("ceiling")!.value = dbToLin(ceil); lim = n; }
+    else { const n = ctx.createDynamicsCompressor(); n.ratio.value = 20; n.knee.value = 0; n.attack.value = 0.001; n.release.value = 0.08; n.threshold.value = ceil - 1.5; lim = n; }
+    s.connect(lim).connect(ctx.destination); s.start();
     out = (await ctx.startRendering()).getChannelData(0);
-    level = spec.metric === "lufs" ? integratedLufs(out, hi) : rmsDb(out);
+    level = integratedLufs(out, hi);
     const miss = spec.target - level; if (Math.abs(miss) < 0.1) break; gain += miss;
   }
-  return { autoGainDb: gain, level, truePeak: peakDb(out) };
+  return { autoGainDb: gain, level, truePeak: peakDb(out), noise };
 }

@@ -7,12 +7,12 @@ import "./studio.css";
 
 const API = "/api/audiobook-studio";
 type Check = { id: string; label: string; value: number | string | null; unit: string; requirement: string; pass: boolean; required?: boolean };
-type Measure = { lufs: number | null; true_peak: number | null; lra: number | null; rms: number; sample_peak: number; noise_floor: number; checks: Check[]; pass: boolean; applied_gain_db?: number; noise_expander?: { threshold_db: number; depth_db: number } | null; source?: "original" | "delivery" };
+type Measure = { lufs: number | null; true_peak: number | null; lra: number | null; rms: number; sample_peak: number; noise_floor: number; checks: Check[]; pass: boolean; applied_gain_db?: number; noise_expander?: Record<string, number> | null; source?: "original" | "delivery" };
 type Versions = Record<string, { lufs: number | null; meta?: { prenorm_gain_db: number; input_lufs: number } }>;
 type Declick = "av" | "lag" | "hog"; type Klang = "varm" | "neutral" | "ljus";
 type Mic = "dynamic" | "condenser";
 const MICS: [Mic, string][] = [["dynamic", "Dynamisk"], ["condenser", "Kondensator"]];
-type Preset = { name: string; label?: string; declick: Declick; klang: Klang; spec: string; mic?: Mic | null; saved: number };
+type Preset = { name: string; label?: string; declick: Declick; klang: Klang; mic?: Mic | null; saved: number };
 // Måste matcha KLANG i backend/studio_engine.py (saltwaves-audiobook).
 const KLANG: Record<Klang, { low: number; high: number }> = { varm: { low: 1.5, high: -1.5 }, neutral: { low: 0, high: 0 }, ljus: { low: -1, high: 2 } };
 const lockedParams = (k: Klang): Params => ({ hpf: 0, low: { f: 200, g: KLANG[k].low }, mid: { f: 1000, g: 0, q: 1 }, high: { f: 6000, g: KLANG[k].high }, comp: { on: false, threshold: -24, ratio: 2.5, attack: 10, release: 150, knee: 4 }, deess: { on: false, freq: 6000, threshold: -32, ratio: 4 }, limiter: { ceiling: -3.5 }, declick: false, dfn: true });
@@ -99,8 +99,7 @@ function EqCurve({ p }: { p: Params }) {
 }
 
 export default function StudioV1() {
-  const [specs, setSpecs] = useState<Spec[]>([]);
-  const [specId, setSpecId] = useState("storytel");
+  const [spec, setSpec] = useState<Spec | null>(null);
   const [params, setParams] = useState<Params | null>(null);
   const [file, setFile] = useState<{ id: string; name: string } | null>(null);
   const [orig, setOrig] = useState<AudioBuffer | null>(null);
@@ -114,7 +113,7 @@ export default function StudioV1() {
   const [buffers, setBuffers] = useState<Record<string, AudioBuffer>>({});
   const [listen, setListen] = useState<"processed" | "original">("processed");
   const [playing, setPlaying] = useState(false); const [pos, setPos] = useState(0);
-  const [prediction, setPrediction] = useState<{ autoGainDb: number; level: number; truePeak: number } | null>(null);
+  const [prediction, setPrediction] = useState<{ autoGainDb: number; level: number; truePeak: number; noise: number | null } | null>(null);
   const [live, setLive] = useState({ lufs: -Infinity, peak: -Infinity });
   const [monitorDb, setMonitorDb] = useState(0);
   const [presets, setPresets] = useState<Preset[]>([]); const [presetName, setPresetName] = useState(""); const [presetLabel, setPresetLabel] = useState("");
@@ -136,9 +135,8 @@ export default function StudioV1() {
     const tick = () => { if (origP.current !== O) return; setOrigPos(Math.min(orig.duration, O.offset + Math.max(0, ctx.currentTime - O.started))); O.raf = requestAnimationFrame(tick); }; O.raf = requestAnimationFrame(tick);
   };
   const live$ = useRef<{ ctx: AudioContext; chain: Chain; srcs: AudioBufferSourceNode[]; vg: Record<string, GainNode>; og: GainNode; wet: GainNode; mon: GainNode; started: number; offset: number; kA: AnalyserNode; pA: AnalyserNode } | null>(null);
-  const spec = specs.find(s => s.id === specId);
 
-  useEffect(() => { api<{ specs: Spec[]; defaults: Params }>("specs").then(r => { setSpecs(r.specs); setParams(r.defaults); }).catch(e => setError(`Studiotjänsten svarar inte: ${e.message}`)); api<{ presets: Preset[] }>("presets").then(r => setPresets(r.presets)).catch(() => {}); }, []);
+  useEffect(() => { api<{ spec: Spec; defaults: Params }>("specs").then(r => { setSpec(r.spec); setParams(r.defaults); }).catch(e => setError(`Studiotjänsten svarar inte: ${e.message}`)); api<{ presets: Preset[] }>("presets").then(r => setPresets(r.presets)).catch(() => {}); }, []);
 
   const uploadFile = async (f: File) => {
     const r = await fetch(`${API}/upload?filename=${encodeURIComponent(f.name)}`, { method: "POST", body: f, headers: { "content-type": "application/octet-stream" } });
@@ -156,8 +154,8 @@ export default function StudioV1() {
     } catch (e) { setError((e as Error).message); } finally { setBusy(""); }
   };
 
-  const doMeasure = async () => { if (!file) return; setBusy("Mäter…"); setError(""); try { setMeasure(await api<Measure>(`${file.id}/measure?spec=${specId}&source=${delivery ? "delivery" : "original"}`, { method: "POST" })); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
-  const doDelivery = async () => { if (!file) return; setDelivery(null); setMeasure(null); setBusy("Nivå, topp och limiter till spec…"); setError(""); try { const r = await api<{ measure: Measure; audio: string }>(`${file.id}/delivery-fix?spec=${specId}`, { method: "POST" }); setDelivery({ measure: r.measure, url: `${API}/${r.audio}?t=${Date.now()}` }); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
+  const doMeasure = async () => { if (!file) return; setBusy("Mäter…"); setError(""); try { setMeasure(await api<Measure>(`${file.id}/measure?source=${delivery ? "delivery" : "original"}`, { method: "POST" })); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
+  const doDelivery = async () => { if (!file) return; setDelivery(null); setMeasure(null); setBusy("Nivå, pausexpander, topp och limiter till Storytel…"); setError(""); try { const r = await api<{ measure: Measure; audio: string }>(`${file.id}/delivery-fix`, { method: "POST" }); setDelivery({ measure: r.measure, url: `${API}/${r.audio}?t=${Date.now()}` }); } catch (e) { setError((e as Error).message); } finally { setBusy(""); } };
   const doFull = async () => {
     if (!file || !orig) return; if (!mic) { setError("Välj mikrofontyp först."); return; } stopLive(); stopOrig();
     const rg = region ?? fitRegion(0, DEFAULT_REGION, orig.duration);
@@ -165,7 +163,7 @@ export default function StudioV1() {
     setBusy(`Kör hela bearbetningskedjan på utsnittet ${mmss(rg.start)}–${mmss(rg.start + rg.length)}…`); setError("");
     const t0 = performance.now();
     try {
-      const r = await api<{ versions: Versions }>(`${file.id}/full-chain?spec=${specId}&start=${rg.start.toFixed(3)}&length=${Math.max(MIN_REGION, rg.length).toFixed(3)}&mic=${mic}`, { method: "POST" });
+      const r = await api<{ versions: Versions }>(`${file.id}/full-chain?start=${rg.start.toFixed(3)}&length=${Math.max(MIN_REGION, rg.length).toFixed(3)}&mic=${mic}`, { method: "POST" });
       const ctx = new OfflineAudioContext(1, 1, 48000); const out: Record<string, AudioBuffer> = {};
       await Promise.all(VERSION_KEYS.map(async k => { out[k] = await decode(`${API}/${file.id}/audio/${k}?t=${Date.now()}`, ctx); }));
       const eb = await decode(`${API}/${file.id}/audio/excerpt?t=${Date.now()}`, ctx);
@@ -194,7 +192,7 @@ export default function StudioV1() {
     for (const k of VERSION_KEYS) L.vg[k].gain.setTargetAtTime(k === current ? 1 : 0, t, 0.01);
     L.wet.gain.setTargetAtTime(listen === "processed" ? 1 : 0, t, 0.01);
     const origLufs = versions?.original.lufs ?? -23;
-    L.og.gain.setTargetAtTime(listen === "original" ? dbToLin(Math.min(20, (spec?.metric === "lufs" ? spec.target : (prediction?.level ?? -20)) - origLufs)) : 0, t, 0.01);
+    L.og.gain.setTargetAtTime(listen === "original" ? dbToLin(Math.min(20, (spec?.target ?? -17.5) - origLufs)) : 0, t, 0.01);
     L.mon.gain.setTargetAtTime(dbToLin(monitorDb), t, 0.01);
   }, [chainParams, prediction, current, listen, versions, spec, monitorDb]);
 
@@ -238,25 +236,26 @@ export default function StudioV1() {
 
   const set = (fn: (p: Params) => Params) => setParams(p => p ? fn(structuredClone(p)) : p);
 
-  const savePreset = async () => { if (!params || !presetName.trim() || !mic) return; try { await api("presets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: presetName.trim(), label: presetLabel.trim(), declick, klang, spec: specId, mic }) }); setPresets((await api<{ presets: Preset[] }>("presets")).presets); } catch (e) { setError((e as Error).message); } };
+  const savePreset = async () => { if (!params || !presetName.trim() || !mic) return; try { await api("presets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: presetName.trim(), label: presetLabel.trim(), declick, klang, mic }) }); setPresets((await api<{ presets: Preset[] }>("presets")).presets); } catch (e) { setError((e as Error).message); } };
 
   const masterFile = async (target: { id: string } | null, f?: File) => {
     if (!params) return; if (!mic) { setMasterState({ state: "failed", error: "Välj mikrofontyp först." }); return; } setError(""); setMasterState({ progress: "Laddar upp hela filen…", state: "running" });
     try {
       const id = f ? (await uploadFile(f)).id : target!.id;
-      const { job } = await api<{ job: string }>(`${id}/master?spec=${specId}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ declick, klang, spec: specId, mic, ...(internal ? { internal_params: params } : {}) }) });
+      const { job } = await api<{ job: string }>(`${id}/master`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ declick, klang, mic, ...(internal ? { internal_params: params } : {}) }) });
       for (;;) { await new Promise(r => setTimeout(r, 1500)); const s = await api<{ state: string; progress: string; result?: Measure; audio?: string; error?: string }>(`jobs/${job}`); setMasterState(s); if (s.state !== "running") break; }
     } catch (e) { setMasterState({ state: "failed", error: (e as Error).message }); }
   };
 
   const ok = (v: number | null | undefined, lo: number, hi: number) => v !== null && v !== undefined && v >= lo && v <= hi;
-  const levelOk = spec && prediction ? (spec.metric === "lufs" ? ok(prediction.level, spec.target - (spec.tolerance ?? 0.5), spec.target + (spec.tolerance ?? 0.5)) : ok(prediction.level, spec.range![0], spec.range![1])) : false;
+  const levelOk = spec && prediction ? ok(prediction.level, spec.target - (spec.tolerance ?? 0.5), spec.target + (spec.tolerance ?? 0.5)) : false;
   const tpOk = spec && prediction ? prediction.truePeak <= spec.peak_max : false;
+  const noiseOk = spec && prediction ? prediction.noise !== null && prediction.noise <= spec.noise_max : false;
 
   return <main className="ab-studio st">
     <header className="ab-header"><Wordmark href="/tools/audiobook" /><span className="ab-badge">SALTWAVES STUDIO · V1</span></header>
     <div className="ab-heading"><div><p className="ab-eyebrow">MÄT · LEVERANSFIX · HELA KEDJAN</p><h1>Hör ändringen<span>.</span></h1></div><p>Ladda upp filen, välj ett utsnitt på 1–5 minuter och kör Full chain. Lyssna, välj klang och spara ett preset. Mastra sedan hela filen med samma inställningar. <a href="/tools/audiobook">← Tillbaka till Audiobook</a></p></div>
-    <div className="st-specbar" role="group" aria-label="Leveransspec">{specs.map(s => <button key={s.id} className="ab-secondary" aria-pressed={s.id === specId} onClick={() => setSpecId(s.id)}>{s.label}</button>)}{spec?.note && <small>{spec.note}</small>}</div>
+    <div className="st-specbar" aria-label="Leveransspec"><b>Storytel</b><small>{spec?.note ?? "−17,5 LUFS ±0,5 · ≤ −3,0 dBTP · brus i pauser ≤ −80 dBFS (median) · 44,1 kHz/16 bit mono"}{spec?.source && <> · <a href={spec.source} target="_blank" rel="noreferrer">Storytels krav</a></>}</small></div>
 
     <section className="ab-workspace">
       <div className="ab-filebar"><div><span className="ab-eyebrow">01 · LJUDFIL</span><h2>{file?.name || "Välj ett utdrag"}</h2></div><button className="ab-secondary" disabled={!!busy} onClick={() => input.current?.click()}>{file ? "Byt fil" : "Välj ljudfil"}</button></div>
@@ -265,28 +264,28 @@ export default function StudioV1() {
         : <div className="st-player"><Waveform buffer={orig} position={playing && exc ? exc.start + pos : origPos} region={region} onRegion={setRegion} onSeek={t => { setOrigPos(t); playOrig(t); }} /><div className="st-transport st-origbar"><button className="ab-play" aria-label={origPlaying ? "Pausa original" : "Spela original"} onClick={() => origPlaying ? stopOrig() : playOrig(origPos)}>{origPlaying ? "Ⅱ" : "▶"}</button><small>{mmss(origPos)} / {mmss(orig.duration)}</small></div>{region && <p className="st-note">Utsnitt för Full chain: {mmss(region.start)}–{mmss(region.start + region.length)} ({f1(region.length / 60)} min). Klicka i vågformen för att lyssna därifrån, dra i det markerade området eller i kanterna för att flytta eller ändra längd (1–5 min).</p>}</div>}
       <div className="st-mic st-choices" role="group" aria-label="Mikrofontyp"><span>Mikrofontyp</span>{MICS.map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={mic === k} onClick={() => { setMic(k); setError(""); }}>{l}</button>)}{!mic && <small>Välj före Full chain</small>}</div>
       <div className="st-actions" aria-label="Bearbetning">
-        <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doMeasure()}><b>1 · Measure</b><span>{delivery ? "Mäter den leveransfixade filen" : "Loudness, true peak, dynamik och brusgolv mot spec"}</span></button>
-        <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doDelivery()}><b>2 · Delivery-fix</b><span>Bara nivå, toppar och limiter till spec</span></button>
+        <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doMeasure()}><b>1 · Measure</b><span>{delivery ? "Mäter den leveransfixade filen" : "Loudness, true peak, LRA och brus i pauser mot Storytel"}</span></button>
+        <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doDelivery()}><b>2 · Delivery-fix</b><span>Nivå, pausexpander och limiter till Storytel</span></button>
         <button className="ab-master" disabled={!file || !!busy || !mic} title={!mic ? "Välj mikrofontyp först" : undefined} onClick={() => void doFull()}><b>3 · Full chain</b><span>Hela kedjan på det valda utsnittet (1–5 min), sedan studiovyn</span></button>
       </div>
       {busy && <p className="ab-status" role="status"><span className="ab-spinner" />{busy}</p>}
       {error && <p className="ab-error" role="alert">{error}</p>}
       {measure && <div className="st-panel"><h3>{measure.source === "delivery" ? "Mätning efter leveransfix" : "Mätning av originalet"} {measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">klarar inte specen</em>}</h3><Checks m={measure} /></div>}
-      {delivery && <div className="st-panel"><h3>Mätning av leveransfixen {delivery.measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">utanför spec: {delivery.measure.checks.filter(c => c.required !== false && !c.pass).map(c => c.label).join(", ")}</em>}</h3><p className="st-note">Den fixade filen är mätt på nytt (44,1 kHz/16 bit efter dither). Nivå {delivery.measure.applied_gain_db !== undefined ? `${delivery.measure.applied_gain_db >= 0 ? "+" : ""}${f1(delivery.measure.applied_gain_db)} dB` : "—"}{delivery.measure.noise_expander ? `, pausexpander under ${f1(delivery.measure.noise_expander.threshold_db)} dBFS (max ${f1(delivery.measure.noise_expander.depth_db)} dB) för att hålla brusgolvet` : ""}.{!delivery.measure.pass ? " Prova Full chain för brusreducering." : ""}</p><audio src={delivery.url} controls /><Checks m={delivery.measure} /><a className="ab-secondary" href={delivery.url} download>Ladda ner WAV</a></div>}
+      {delivery && <div className="st-panel"><h3>Mätning av leveransfixen {delivery.measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">utanför spec: {delivery.measure.checks.filter(c => c.required !== false && !c.pass).map(c => c.label).join(", ")}</em>}</h3><p className="st-note">Den fixade filen är mätt på nytt (44,1 kHz/16 bit efter dither, brus i pauser enligt pausmätningen). Nivå {delivery.measure.applied_gain_db !== undefined ? `${delivery.measure.applied_gain_db >= 0 ? "+" : ""}${f1(delivery.measure.applied_gain_db)} dB` : "—"}. Pausexpander alltid på (stänger under −55 dBFS, hold 60 ms, release 150 ms, golv ≈ −87 dBFS).{!delivery.measure.pass ? " Prova Full chain för brusreducering." : ""}</p><audio src={delivery.url} controls /><Checks m={delivery.measure} /><a className="ab-secondary" href={delivery.url} download>Ladda ner WAV</a></div>}
     </section>
 
     {versions && params && spec && <section className="st-adjust">
-      <div className="st-adjust-head"><div><p className="ab-eyebrow">02 · LYSSNA OCH VÄLJ</p><h2>Din master</h2><p>Brusreducering, EQ, kompression, de-esser, limiter och nivå mot spec sätts automatiskt utifrån materialet. Du väljer klickborttagning, klang och leveransspec.</p></div>
+      <div className="st-adjust-head"><div><p className="ab-eyebrow">02 · LYSSNA OCH VÄLJ</p><h2>Din master</h2><p>Brusreducering, EQ, kompression, de-esser, limiter och nivå sätts automatiskt utifrån materialet. Pausexpander och nivå till Storytel (−17,5 LUFS) ingår alltid. Du väljer klickborttagning och klang.</p></div>
         <div className="st-transport"><button className="ab-play" aria-label={playing ? "Pausa" : "Spela"} onClick={() => playing ? stopLive() : void playLive()}>{playing ? "Ⅱ" : "▶"}</button><div className="ab-switch" role="group" aria-label="A/B"><button aria-pressed={listen === "original"} onClick={() => setListen("original")}>A · Original</button><button aria-pressed={listen === "processed"} onClick={() => setListen("processed")}>B · Bearbetat</button></div><small>Nivåmatchat</small></div></div>
       {exc && <div className="st-excerpt"><p className="st-note">Utsnitt {mmss(exc.start)}–{mmss(exc.start + exc.buffer.duration)}. Klicka var som helst för att spela A/B därifrån.</p><Waveform buffer={exc.buffer} position={pos} onSeek={t => { stopOrig(); setPos(t); void playLive(t); }} /></div>}
       <div className="st-choices">
         <div role="group" aria-label="Klickborttagning"><span>Klickborttagning</span>{([["av", "Av"], ["lag", "Låg"], ["hog", "Hög"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={declick === k} onClick={() => setDeclick(k)}>{l}</button>)}</div>
         {!internal && <div role="group" aria-label="Klang"><span>Klang</span>{([["varm", "Varm"], ["neutral", "Neutral"], ["ljus", "Ljus"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={klang === k} onClick={() => setKlang(k)}>{l}</button>)}</div>}
-        <div role="group" aria-label="Spec"><span>Spec</span>{specs.map(s => <button key={s.id} className="ab-secondary" aria-pressed={s.id === specId} onClick={() => setSpecId(s.id)}>{s.id === "acx" ? "ACX" : "Storytel"}</button>)}</div>
       </div>
-      <div className="st-meters st-meters-2">
-        <div className={levelOk ? "st-ok" : "st-bad"}><span>Förväntad master, {spec.metric === "lufs" ? "integrerad" : "RMS"}</span><b>{prediction ? f1(prediction.level) : "…"} {spec.metric === "lufs" ? "LUFS" : "dBFS"}</b><small>Krav {spec.metric === "lufs" ? `${f1(spec.target)} ± ${spec.tolerance}` : `${spec.range![0]} till ${spec.range![1]}`}</small></div>
+      <div className="st-meters st-meters-3">
+        <div className={levelOk ? "st-ok" : "st-bad"}><span>Förväntad master, integrerad</span><b>{prediction ? f1(prediction.level) : "…"} LUFS</b><small>Krav {f1(spec.target - (spec.tolerance ?? 0.5))} till {f1(spec.target + (spec.tolerance ?? 0.5))}</small></div>
         <div className={tpOk ? "st-ok" : "st-bad"}><span>Förväntad true peak</span><b>{prediction ? f1(prediction.truePeak) : "…"} dBTP</b><small>Krav ≤ {f1(spec.peak_max)}</small></div>
+        <div className={noiseOk ? "st-ok" : "st-bad"}><span>Förväntat brus i pauser (median)</span><b>{prediction ? f1(prediction.noise) : "…"} dBFS</b><small>Krav ≤ {f1(spec.noise_max, 0)} · före dither</small></div>
       </div>
       {internal && <div className="st-grid"><p className="st-note">Internt läge: fria reglage ovanpå den automatiska kedjan (ersätter klang).</p>
         <div className="st-box"><h3>EQ</h3><EqCurve p={params} />
@@ -305,7 +304,7 @@ export default function StudioV1() {
           <Slider label="Lyssningsvolym" value={monitorDb} min={-20} max={6} step={0.5} unit="dB" onChange={setMonitorDb} /></div></div>}
       <div className="st-panel"><h3>Presets</h3>
         <div className="st-preset"><input placeholder="Namn" value={presetName} onChange={e => setPresetName(e.target.value)} /><input placeholder="Inläsare eller bok (valfritt)" value={presetLabel} onChange={e => setPresetLabel(e.target.value)} /><button className="ab-secondary" disabled={!presetName.trim() || !mic} onClick={() => void savePreset()}>Spara</button></div>
-        <ul className="st-presets">{presets.map(p => <li key={p.name}><button className="ab-secondary" title={`${p.label || ""} ${p.declick}/${p.klang}/${p.spec}`} onClick={() => { setDeclick(p.declick); setKlang(p.klang); setSpecId(p.spec); setMic(p.mic ?? null); if (!p.mic) setError(`Presetet "${p.name}" saknar mikrofontyp. Välj Dynamisk eller Kondensator.`); setPresetName(p.name); setPresetLabel(p.label || ""); }}>{p.name}{p.label ? ` · ${p.label}` : ""}</button></li>)}</ul>
+        <ul className="st-presets">{presets.map(p => <li key={p.name}><button className="ab-secondary" title={`${p.label || ""} ${p.declick}/${p.klang}/${p.mic ?? "mic saknas"}`} onClick={() => { setDeclick(p.declick); setKlang(p.klang); setMic(p.mic ?? null); if (!p.mic) setError(`Presetet "${p.name}" saknar mikrofontyp. Välj Dynamisk eller Kondensator.`); setPresetName(p.name); setPresetLabel(p.label || ""); }}>{p.name}{p.label ? ` · ${p.label}` : ""}</button></li>)}</ul>
       </div>
       <div className="st-panel"><p className="ab-eyebrow">03 · MASTRA HELA FILEN</p><p>Samma automatiska kedja och dina val körs på hela filen. Exporten blir 44,1 kHz, 16 bit mono med dither.</p>
         <div className="st-row"><button className="ab-master" disabled={masterState?.state === "running" || !mic} onClick={() => fullInput.current?.click()}>Välj hela filen och mastra</button><button className="ab-secondary" disabled={masterState?.state === "running" || !mic} onClick={() => void masterFile(file)} >Mastra den här filen</button></div>
