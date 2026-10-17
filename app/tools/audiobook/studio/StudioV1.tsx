@@ -74,6 +74,13 @@ function Checks({ m }: { m: Measure }) {
   return <table className="st-checks"><tbody>{m.checks.map(c => <tr key={c.id}><td>{c.label}</td><td>{typeof c.value === "number" ? `${f1(c.value)} ${c.unit}` : c.value ?? "—"}</td><td>{c.requirement}</td><td className={c.required === false ? "" : c.pass ? "st-ok" : "st-bad"}>{c.required === false ? "—" : c.pass ? "OK" : "Utanför"}</td></tr>)}</tbody></table>;
 }
 
+const noiseFails = (m: Measure) => m.checks.some(c => c.id === "noise" && !c.pass);
+function NoiseHint({ m, onGo }: { m: Measure; onGo: () => void }) {
+  if (!noiseFails(m)) return null;
+  const v = m.checks.find(c => c.id === "noise")?.value;
+  return <div className="st-hint" role="alert"><p><b>Brusgolvet klarar inte Storytels −80 dBFS</b>{typeof v === "number" ? ` (uppmätt ${f1(v)} dBFS i pauserna)` : ""}. Kör Full chain, som tar bort bruset.</p><button className="ab-master" onClick={onGo}>Gå till Full chain</button></div>;
+}
+
 function Slider({ label, value, min, max, step, unit, onChange }: { label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
   return <label className="st-slider"><span>{label}</span><input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} /><b>{f1(value, step < 1 ? 1 : 0)} {unit}</b></label>;
 }
@@ -123,6 +130,9 @@ export default function StudioV1() {
   const [masterState, setMasterState] = useState<{ progress?: string; state?: string; result?: Measure; audio?: string; error?: string } | null>(null);
   const input = useRef<HTMLInputElement>(null); const fullInput = useRef<HTMLInputElement>(null);
   const audioEl = useRef<HTMLAudioElement>(null);
+  const playerRef = useRef<HTMLDivElement>(null); const fullBtn = useRef<HTMLButtonElement>(null);
+  const [flashFull, setFlashFull] = useState(false);
+  const goFull = () => { playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); setFlashFull(true); setTimeout(() => setFlashFull(false), 2500); setTimeout(() => fullBtn.current?.focus({ preventScroll: true }), 600); };
   const origP = useRef<{ ctx: AudioContext; src: AudioBufferSourceNode; started: number; offset: number; raf: number } | null>(null);
   const [origPlaying, setOrigPlaying] = useState(false); const [origPos, setOrigPos] = useState(0);
   const stopOrig = () => { const O = origP.current; if (O) { cancelAnimationFrame(O.raf); try { O.src.stop(); } catch { /* */ } void O.ctx.close(); origP.current = null; } setOrigPlaying(false); };
@@ -140,6 +150,7 @@ export default function StudioV1() {
 
   const uploadFile = async (f: File) => {
     const r = await fetch(`${API}/upload?filename=${encodeURIComponent(f.name)}`, { method: "POST", body: f, headers: { "content-type": "application/octet-stream" } });
+    if (r.status === 413) throw new Error("Filen är större än 100 MB. Det klarar preview-länken inte ännu. Prova en kortare fil eller använd studion lokalt.");
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "Uppladdningen misslyckades");
     return r.json() as Promise<{ id: string; duration: number; filename: string }>;
   };
@@ -261,17 +272,17 @@ export default function StudioV1() {
       <div className="ab-filebar"><div><span className="ab-eyebrow">01 · LJUDFIL</span><h2>{file?.name || "Välj ett utdrag"}</h2></div><button className="ab-secondary" disabled={!!busy} onClick={() => input.current?.click()}>{file ? "Byt fil" : "Välj ljudfil"}</button></div>
       <input ref={input} hidden type="file" accept=".wav,.mp3,.m4a,.aif,.aiff,.flac" onChange={e => { if (e.target.files?.[0]) void choose(e.target.files[0]); e.target.value = ""; }} />
       {!orig ? <div className="ab-drop" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) void choose(e.dataTransfer.files[0]); }}><div className="ab-drop-icon">↑</div><p>Dra din ljudfil hit</p><span>WAV, MP3, M4A, AIFF eller FLAC · du väljer ett utsnitt på 1–5 min</span></div>
-        : <div className="st-player"><Waveform buffer={orig} position={playing && exc ? exc.start + pos : origPos} region={region} onRegion={setRegion} onSeek={t => { setOrigPos(t); playOrig(t); }} /><div className="st-transport st-origbar"><button className="ab-play" aria-label={origPlaying ? "Pausa original" : "Spela original"} onClick={() => origPlaying ? stopOrig() : playOrig(origPos)}>{origPlaying ? "Ⅱ" : "▶"}</button><small>{mmss(origPos)} / {mmss(orig.duration)}</small></div>{region && <p className="st-note">Utsnitt för Full chain: {mmss(region.start)}–{mmss(region.start + region.length)} ({f1(region.length / 60)} min). Klicka i vågformen för att lyssna därifrån, dra i det markerade området eller i kanterna för att flytta eller ändra längd (1–5 min).</p>}</div>}
+        : <div className="st-player" ref={playerRef}><Waveform buffer={orig} position={playing && exc ? exc.start + pos : origPos} region={region} onRegion={setRegion} onSeek={t => { setOrigPos(t); playOrig(t); }} /><div className="st-transport st-origbar"><button className="ab-play" aria-label={origPlaying ? "Pausa original" : "Spela original"} onClick={() => origPlaying ? stopOrig() : playOrig(origPos)}>{origPlaying ? "Ⅱ" : "▶"}</button><small>{mmss(origPos)} / {mmss(orig.duration)}</small></div>{region && <p className="st-note">Utsnitt för Full chain: {mmss(region.start)}–{mmss(region.start + region.length)} ({f1(region.length / 60)} min). Klicka i vågformen för att lyssna därifrån, dra i det markerade området eller i kanterna för att flytta eller ändra längd (1–5 min).</p>}</div>}
       <div className="st-mic st-choices" role="group" aria-label="Mikrofontyp"><span>Mikrofontyp</span>{MICS.map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={mic === k} onClick={() => { setMic(k); setError(""); }}>{l}</button>)}{!mic && <small>Välj före Full chain</small>}</div>
       <div className="st-actions" aria-label="Bearbetning">
         <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doMeasure()}><b>1 · Measure</b><span>{delivery ? "Mäter den leveransfixade filen" : "Loudness, true peak, LRA och brus i pauser mot Storytel"}</span></button>
         <button className="ab-secondary" disabled={!file || !!busy} onClick={() => void doDelivery()}><b>2 · Delivery-fix</b><span>Nivå, pausexpander och limiter till Storytel</span></button>
-        <button className="ab-master" disabled={!file || !!busy || !mic} title={!mic ? "Välj mikrofontyp först" : undefined} onClick={() => void doFull()}><b>3 · Full chain</b><span>Hela kedjan på det valda utsnittet (1–5 min), sedan studiovyn</span></button>
+        <button ref={fullBtn} className={`ab-master${flashFull ? " st-flash" : ""}`} disabled={!file || !!busy || !mic} title={!mic ? "Välj mikrofontyp först" : undefined} onClick={() => void doFull()}><b>3 · Full chain</b><span>Hela kedjan på det valda utsnittet (1–5 min), sedan studiovyn</span></button>
       </div>
       {busy && <p className="ab-status" role="status"><span className="ab-spinner" />{busy}</p>}
       {error && <p className="ab-error" role="alert">{error}</p>}
-      {measure && <div className="st-panel"><h3>{measure.source === "delivery" ? "Mätning efter leveransfix" : "Mätning av originalet"} {measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">klarar inte specen</em>}</h3><Checks m={measure} /></div>}
-      {delivery && <div className="st-panel"><h3>Mätning av leveransfixen {delivery.measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">utanför spec: {delivery.measure.checks.filter(c => c.required !== false && !c.pass).map(c => c.label).join(", ")}</em>}</h3><p className="st-note">Den fixade filen är mätt på nytt (44,1 kHz/16 bit efter dither, brus i pauser enligt pausmätningen). Nivå {delivery.measure.applied_gain_db !== undefined ? `${delivery.measure.applied_gain_db >= 0 ? "+" : ""}${f1(delivery.measure.applied_gain_db)} dB` : "—"}. Pausexpander alltid på (stänger under −55 dBFS, hold 60 ms, release 150 ms, golv ≈ −87 dBFS).{!delivery.measure.pass ? " Prova Full chain för brusreducering." : ""}</p><audio src={delivery.url} controls /><Checks m={delivery.measure} /><a className="ab-secondary" href={delivery.url} download>Ladda ner WAV</a></div>}
+      {measure && <div className="st-panel"><h3>{measure.source === "delivery" ? "Mätning efter leveransfix" : "Mätning av originalet"} {measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">klarar inte specen</em>}</h3><NoiseHint m={measure} onGo={goFull} /><Checks m={measure} /></div>}
+      {delivery && <div className="st-panel"><h3>Mätning av leveransfixen {delivery.measure.pass ? <em className="st-ok">klarar specen</em> : <em className="st-bad">utanför spec: {delivery.measure.checks.filter(c => c.required !== false && !c.pass).map(c => c.label).join(", ")}</em>}</h3><p className="st-note">Den fixade filen är mätt på nytt (44,1 kHz/16 bit efter dither, brus i pauser enligt pausmätningen). Nivå {delivery.measure.applied_gain_db !== undefined ? `${delivery.measure.applied_gain_db >= 0 ? "+" : ""}${f1(delivery.measure.applied_gain_db)} dB` : "—"}. Pausexpander alltid på (stänger under −55 dBFS, hold 60 ms, release 150 ms, golv ≈ −87 dBFS).</p><NoiseHint m={delivery.measure} onGo={goFull} /><audio src={delivery.url} controls /><Checks m={delivery.measure} />{delivery.measure.pass ? <a className="ab-secondary" href={delivery.url} download>Ladda ner WAV</a> : <><p className="st-bad st-note"><b>Filen klarar inte Storytel-specen</b> ({delivery.measure.checks.filter(c => c.required !== false && !c.pass).map(c => c.label).join(", ")}). Den kan laddas ner, men bör inte levereras.</p><a className="ab-secondary st-bad-link" href={delivery.url} download={`${(file?.name || "fil").replace(/\.[^.]+$/, "")}-delivery-KLARAR-INTE-SPEC.wav`}>Ladda ner WAV (klarar inte specen)</a></>}</div>}
     </section>
 
     {versions && params && spec && <section className="st-adjust">
