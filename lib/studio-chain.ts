@@ -157,30 +157,83 @@ export function pauseMedian(x: Float32Array, sr: number): number | null {
   return vals.length % 2 ? vals[m] : (vals[m - 1] + vals[m]) / 2;
 }
 
-/** Förutsäger mastern som servern gör den: kedja -> nivå -> pausexpander -> limiter i 192 kHz (≈ true peak). */
-export async function predict(buffer: AudioBuffer, p: Params, spec: Spec) {
-  const sr = buffer.sampleRate;
-  const render = async (gainDb: number) => {
-    const c0 = new OfflineAudioContext(1, buffer.length, sr); const s0 = c0.createBufferSource(); s0.buffer = buffer;
-    const ch = buildChain(c0, p, gainDb, false); s0.connect(ch.input); ch.output.connect(c0.destination); s0.start();
-    return (await c0.startRendering()).getChannelData(0);
+/** Exakt port av ffmpeg 8 af_alimiter.c (mono, level=disabled, latency=0), som serverns slutsteg:
+ *  alimiter=limit=..:level=disabled:attack=1:release=80:asc=1 i 192 kHz. Används offline i prediktionen. */
+export function alimiterOffline(x: Float32Array | Float64Array, sr: number, limit: number, attackMs = 1, releaseMs = 80, autoRelease = true): Float64Array {
+  const release = releaseMs / 1000, bs = Math.trunc(sr * (attackMs / 1000));
+  const buffer = new Float64Array(bs), nextpos = new Int32Array(bs).fill(-1), nextdelta = new Float64Array(bs);
+  const y = new Float64Array(x.length), ascCoeff = Math.pow(0.5, 0.5 - 0.5) * 2 * -1;
+  let pos = 0, att = 1, delta = 0, nextiter = 0, nextlen = 0, ascSum = 0, ascC = 0, ascPos = -1;
+  const rd = (patt: number, asc: boolean) => {
+    let r = (1 - patt) / (sr * release);
+    if (asc && autoRelease && ascC > 0) { const a = limit / (ascCoeff * ascSum) * ascC; if (a > patt) { const d = Math.max((a - patt) / (sr * release), r / 10); if (d < r) r = d; } }
+    return r;
   };
-  const r1 = await render(0);
-  let gain = spec.target - integratedLufs(r1, sr);
-  const hi = 192000, len = Math.ceil(buffer.length * hi / sr);
-  let out: Float32Array = new Float32Array(0), level = -Infinity, noise: number | null = null;
-  for (let it = 0; it < 3; it++) {
-    const ex = pauseExpander(await render(gain), sr); noise = pauseMedian(ex, sr);
-    const ctx = new OfflineAudioContext(1, len, hi); const worklet = await loadLimiter(ctx);
-    const b = ctx.createBuffer(1, ex.length, sr); b.copyToChannel(ex as Float32Array<ArrayBuffer>, 0);
-    const s = ctx.createBufferSource(); s.buffer = b; const ceil = Math.min(p.limiter.ceiling, -3.3);
-    let lim: AudioNode;
-    if (worklet) { const n = new AudioWorkletNode(ctx, "sw-limiter"); n.parameters.get("ceiling")!.value = dbToLin(ceil); lim = n; }
-    else { const n = ctx.createDynamicsCompressor(); n.ratio.value = 20; n.knee.value = 0; n.attack.value = 0.001; n.release.value = 0.08; n.threshold.value = ceil - 1.5; lim = n; }
-    s.connect(lim).connect(ctx.destination); s.start();
-    out = (await ctx.startRendering()).getChannelData(0);
-    level = integratedLufs(out, hi);
-    const miss = spec.target - level; if (Math.abs(miss) < 0.1) break; gain += miss;
+  for (let n = 0; n < x.length; n++) {
+    const sample = x[n]; buffer[pos] = sample; let peak = Math.abs(sample);
+    if (autoRelease && peak > limit) { ascSum += peak; ascC++; }
+    if (peak > limit) {
+      const patt = Math.min(limit / peak, 1), rdelta = rd(patt, false), d = (limit / peak - att) / bs;
+      if (d < delta) { delta = d; nextpos[0] = pos; nextpos[1 % bs] = -1; nextdelta[0] = rdelta; nextlen = 1; nextiter = 0; }
+      else {
+        let found = false, i = nextiter;
+        for (; i < nextiter + nextlen; i++) {
+          const j = i % bs; let ppeak = 0;
+          if (nextpos[j] >= 0) ppeak = Math.abs(buffer[nextpos[j]]);
+          const pdelta = (limit / peak - limit / ppeak) / ((bs - nextpos[j] + pos) % bs);
+          if (pdelta < nextdelta[j]) { nextdelta[j] = pdelta; found = true; break; }
+        }
+        if (found) { nextlen = i - nextiter + 1; nextpos[(nextiter + nextlen) % bs] = pos; nextdelta[(nextiter + nextlen) % bs] = rdelta; nextpos[(nextiter + nextlen + 1) % bs] = -1; nextlen++; }
+      }
+    }
+    const bi = (pos + 1) % bs, b = buffer[bi]; peak = Math.abs(b);
+    if (pos === ascPos) ascPos = -1;
+    if (autoRelease && ascPos === -1 && peak > limit) { ascSum -= peak; ascC--; }
+    att += delta; let out = b * att;
+    if (bi === nextpos[nextiter]) {
+      if (autoRelease) {
+        delta = rd(att, true);
+        if (nextlen > 1) { const pn = nextpos[(nextiter + 1) % bs]; const ppeak = Math.abs(buffer[pn]); const pdelta = (limit / ppeak - att) / ((bs + pn - bi) % bs); if (pdelta < delta) delta = pdelta; }
+      } else { delta = nextdelta[nextiter]; att = limit / peak; }
+      nextlen -= 1; nextpos[nextiter] = -1; nextiter = (nextiter + 1) % bs;
+    }
+    if (att > 1) { att = 1; delta = 0; nextiter = 0; nextlen = 0; nextpos[0] = -1; }
+    if (att <= 0) { att = 0.0000000000001; delta = (1 - att) / (sr * release); }
+    if (att !== 1 && (1 - att) < 0.0000000000001) att = 1;
+    if (delta !== 0 && Math.abs(delta) < 0.00000000000001) delta = 0;
+    out = Math.max(-limit, Math.min(limit, out));
+    y[n] = out; pos = (pos + 1) % bs;
   }
-  return { autoGainDb: gain, level, truePeak: peakDb(out), noise };
+  return y;
+}
+
+/** Förutsäger mastern med serverns låsta slutsteg (backend finalize): kedja (klang) -> gain -> pausexpander (48 kHz)
+ *  -> 192 kHz -> alimiter (exakt port) -> mätning. Iterera gain som servern tills nivån ligger inom 0,03 LU.
+ *  Pausbruset mäts efter expandern och läggs ihop med 16-bitars TPDF-dither (≈ −95 dBFS), som serverns slutfil. */
+const DITHER_DB = -95.1;
+export async function predict(buffer: AudioBuffer, p: Params, spec: Spec) {
+  const sr = buffer.sampleRate, hi = 192000;
+  const c0 = new OfflineAudioContext(1, buffer.length, sr); const s0 = c0.createBufferSource(); s0.buffer = buffer;
+  const ch = buildChain(c0, p, 0, false); s0.connect(ch.input); ch.output.connect(c0.destination); s0.start();
+  const base = (await c0.startRendering()).getChannelData(0);
+  const ceil = dbToLin(Math.min(p.limiter.ceiling, spec.peak_max - 0.3));
+  const run = async (gainDb: number) => {
+    const g = dbToLin(gainDb), xg = new Float32Array(base.length); for (let i = 0; i < base.length; i++) xg[i] = base[i] * g;
+    const ex = pauseExpander(xg, sr);
+    const up = new OfflineAudioContext(1, Math.ceil(ex.length * hi / sr), hi); const b = up.createBuffer(1, ex.length, sr);
+    b.copyToChannel(ex as Float32Array<ArrayBuffer>, 0); const s = up.createBufferSource(); s.buffer = b; s.connect(up.destination); s.start();
+    const lim = alimiterOffline((await up.startRendering()).getChannelData(0), hi, ceil);
+    let pk = 0; for (let i = 0; i < lim.length; i++) { const a = Math.abs(lim[i]); if (a > pk) pk = a; }
+    const out32 = Float32Array.from(lim), n = pauseMedian(out32, hi); // brus mäts efter limitern, som serverns slutfil
+    return { gain: gainDb, level: integratedLufs(out32, hi), tp: linToDb(pk), noise: n === null ? null : 10 * Math.log10(Math.pow(10, n / 10) + Math.pow(10, DITHER_DB / 10)) };
+  };
+  const iters: { gain: number; level: number; tp: number; noise: number | null }[] = [];
+  let gain = spec.target - integratedLufs(base, sr), r = await run(gain); iters.push(r);
+  for (let it = 0; it < 6 && Math.abs(spec.target - r.level) > 0.03; it++) {
+    // sekantsteg (limitern gör att +1 dB gain ger mindre än +1 LU), annars rakt steg som servern
+    const prev = iters.length > 1 ? iters[iters.length - 2] : null;
+    const slope = prev && Math.abs(r.level - prev.level) > 1e-3 ? Math.max(0.2, Math.min(1.5, (r.level - prev.level) / (r.gain - prev.gain))) : 1;
+    gain = r.gain + (spec.target - r.level) / slope; r = await run(gain); iters.push(r);
+  }
+  return { autoGainDb: r.gain, level: r.level, truePeak: r.tp, noise: r.noise, iters };
 }
