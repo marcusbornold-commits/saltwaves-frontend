@@ -1,0 +1,27 @@
+.sp-grid{display:grid;gap:14px}
+.sp-card{border:1px solid currentColor;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;gap:16px;align-items:center;text-decoration:none;color:inherit}
+.sp-card:hover{background:rgba(127,127,127,.06)}
+.sp-card h3{margin:0 0 4px;font-size:20px}
+.sp-card p{margin:0;opacity:.7}
+.sp-pills{display:flex;gap:8px;flex-wrap:wrap}
+.sp-pill{font-size:12px;letter-spacing:.06em;text-transform:uppercase;border:1px solid currentColor;border-radius:99px;padding:4px 10px;white-space:nowrap}
+.sp-ok{color:#1f7a4a}.sp-bad{color:#b4321f}.sp-wait{color:#9a6a00}
+.sp-form{display:grid;grid-template-columns:2fr 1.5fr 1fr auto;gap:10px;align-items:end}
+.sp-form label,.sp-field{display:grid;gap:6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.sp-form input,.sp-field input,.sp-field select,.sp-name{font:inherit;font-size:15px;letter-spacing:0;text-transform:none;padding:10px 12px;border:1px solid currentColor;border-radius:10px;background:transparent;color:inherit}
+.sp-name{padding:6px 8px;width:100%;border-color:transparent}
+.sp-name:hover,.sp-name:focus{border-color:currentColor}
+.sp-table{width:100%;border-collapse:collapse}
+.sp-table th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;text-align:left;opacity:.65;padding:8px}
+.sp-table td{padding:10px 8px;border-top:1px solid rgba(127,127,127,.3);vertical-align:top}
+.sp-checks{display:grid;gap:4px;margin:0;padding:0;list-style:none;font-size:13px}
+.sp-checks li{display:flex;gap:6px;align-items:baseline}
+.sp-dot{width:9px;height:9px;border-radius:50%;flex:none;background:currentColor;display:inline-block}
+.sp-links{display:grid;gap:8px}
+.sp-link{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid rgba(127,127,127,.4);border-radius:10px;padding:10px 14px}
+.sp-new{font-family:ui-monospace,monospace;font-size:13px;word-break:break-all;padding:10px 12px;border:1px dashed currentColor;border-radius:10px}
+.sp-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sp-progress{height:6px;border-radius:3px;background:rgba(127,127,127,.25);overflow:hidden}
+.sp-progress span{display:block;height:100%;background:currentColor}
+.sp-small{font-size:13px;opacity:.75}
+@media (max-width:760px){.sp-form{grid-template-columns:1fr}.sp-table thead{display:none}.sp-table td{display:block;border:0;padding:4px 0}.sp-table tr{display:block;border-top:1px solid rgba(127,127,127,.3);padding:10px 0}}

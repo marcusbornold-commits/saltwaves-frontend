@@ -1,0 +1,30 @@
+// Producentlänk (ingen inloggning): kan BARA visa bokens titel och ladda upp till just den boken.
+// Inga kapitellistor, inga mätvärden, ingen lyssning eller nedladdning. Filerna mastras inte, de mäts mot specen.
+import { NextRequest } from "next/server";
+import { createChapter, db, fail, linkByToken, linkFolder, noStore, tusGrant, tusPathOk } from "@/lib/sjoberg-portal";
+
+export const dynamic = "force-dynamic";
+async function handle(req: NextRequest, ctx: { params: Promise<{ token: string; path?: string[] }> }) {
+  const { token, path = [] } = await ctx.params;
+  try {
+    const l = await linkByToken(token);
+    if (!l) return fail("Länken finns inte.", 404);
+    if (req.method === "GET" && path.length === 0) {
+      const { data: b } = await db().from("sjoberg_books").select("title, narrator").eq("id", l.book_id).maybeSingle();
+      return Response.json({ title: b?.title || "", narrator: b?.narrator || "", open: l.open, expires: l.expires_at }, { headers: noStore });
+    }
+    if (req.method !== "POST" || path.length !== 1) return fail("Ogiltig förfrågan.", 404);
+    if (!l.open) return fail("Länken är stängd eller har gått ut. Kontakta förlaget.", 410);
+    const x = await req.json().catch(() => ({})) as Record<string, unknown>;
+    if (path[0] === "tus") return tusGrant(linkFolder(l.id), String(x.filename || "").slice(0, 255), Number(x.size));
+    if (path[0] === "klar") {
+      const p = String(x.path || "");
+      if (!tusPathOk(linkFolder(l.id), p)) return fail("Ogiltig uppladdning.");
+      await createChapter(l.book_id, "producer", p, String(x.filename || "kapitel.wav").slice(0, 255), l.id);
+      return Response.json({ ok: true }, { headers: noStore });
+    }
+  } catch { return fail("Tjänsten svarar inte just nu. Försök igen om en stund.", 503); }
+  return fail("Ogiltig förfrågan.", 404);
+}
+export const GET = handle;
+export const POST = handle;
