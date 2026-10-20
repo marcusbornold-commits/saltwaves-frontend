@@ -3,11 +3,15 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 export const STUDIO_COOKIE = "sw_studio_invite";
-type Invite = { name: string; hash: string; created: string; revoked?: string | null };
+type Invite = { name: string; hash: string; created: string; revoked?: string | null; scope?: string };
+// scope: saknas/"studio" = hela studion; "sjoberg" = bara Sjöberg-sidan.
+export type InviteScope = "studio" | "sjoberg";
 
 export function studioInviteFile(): string | undefined { return process.env.STUDIO_INVITES_FILE || undefined; }
 
-export function verifyStudioToken(token: string | undefined | null): string | null {
+export function verifyStudioToken(token: string | undefined | null): string | null { return verifyStudioInvite(token)?.name ?? null; }
+
+export function verifyStudioInvite(token: string | undefined | null): { name: string; scope: InviteScope } | null {
   const file = studioInviteFile();
   if (!file || !token || token.length < 20 || token.length > 200) return null;
   let invites: Invite[] = [];
@@ -16,7 +20,7 @@ export function verifyStudioToken(token: string | undefined | null): string | nu
   for (const inv of invites) {
     if (inv.revoked) continue;
     const b = Buffer.from(inv.hash || "", "hex");
-    if (b.length === h.length && timingSafeEqual(b, h)) return inv.name;
+    if (b.length === h.length && timingSafeEqual(b, h)) return { name: inv.name, scope: inv.scope === "sjoberg" ? "sjoberg" : "studio" };
   }
   return null;
 }

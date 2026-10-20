@@ -1,0 +1,9 @@
+.sj-shell{max-width:880px;margin:0 auto}
+.sj-hero{margin:48px 0 20px}.sj-hero h1{margin:.2em 0}
+.sj-spec{margin-bottom:28px}
+.sj-drop,.sj-result{border:1px solid currentColor;border-radius:14px;padding:28px;margin:0 0 24px;opacity:.97}
+.sj-drop{border-style:dashed;transition:background .15s}
+.sj-drop.is-drag{background:rgba(127,127,127,.12)}
+.sj-drop .ab-master,.sj-download{display:inline-flex;gap:12px;margin-top:12px;text-decoration:none}
+.sj-player{width:100%;margin:18px 0 6px}
+.sj-result table{width:100%;margin-top:12px}
