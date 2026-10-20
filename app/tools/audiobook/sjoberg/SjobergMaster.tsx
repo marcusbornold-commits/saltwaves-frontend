@@ -17,7 +17,7 @@ type Check = { id: string; label: string; value: number | string | null; unit?: 
 type Measure = { pass: boolean; checks: Check[] };
 type Done = { mode: Mode; start: number; before: Track; after: Track; master: Measure; original: Measure | null; blob: Blob; upload: string; job: string; duration: number };
 type BookRef = { id: string; title: string; narrator: string };
-type Saved = { book: string; title: string; number: number; name: string };
+type Saved = { book: string; title: string; number: number; name: string; running?: boolean };
 const PORTAL = "/api/sjoberg-portal";
 // Samma tolkning av kapitelnummer som portalen (servern gör samma sak om fältet lämnas tomt).
 function guessChapter(filename: string) {
@@ -145,9 +145,9 @@ export default function SjobergMaster() {
     catch { setPhase("idle"); setError("Filen kunde inte läsas."); }
   }
 
-  async function archive(d: Done) {
+  async function archive(d: Pick<Done, "upload" | "job" | "duration">, running = false) {
     if (!metaOk) { setError("Välj bok och ange kapitlets namn först."); return; }
-    setSaving(true); setError(""); setMessage("Sparar i arkivet…");
+    if (!running) { setSaving(true); setMessage("Sparar i arkivet…"); } setError("");
     try {
       let book = bookSel, title = books.find(x => x.id === bookSel)?.title || "";
       if (book === "new") {
@@ -157,13 +157,13 @@ export default function SjobergMaster() {
       }
       const r = await fetch(`${PORTAL}/books/${book}/archive`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ upload: d.upload, job: d.job, filename: name, number: chNum.trim(), name: chName.trim(), duration: d.duration }) });
       const x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || "Kapitlet kunde inte sparas i arkivet.");
-      setSaved({ book, title, number: x.number, name: x.name });
+      setSaved({ book, title, number: x.number, name: x.name, running });
     } catch (e) { setError(e instanceof Error && e.message ? e.message : "Kapitlet kunde inte sparas i arkivet."); }
-    finally { setSaving(false); setMessage(""); }
+    finally { if (!running) { setSaving(false); setMessage(""); } }
   }
   async function run(mode: Mode, save = false) {
     if (busy || !file || !source) return;
-    stop(); mix("before"); setError(""); setPhase("uploading");
+    stop(); mix("before"); setError(""); setPhase("uploading"); if (mode === "master") setSaved(null);
     try {
       const at = mode === "preview" ? start : 0;
       const blob = mode === "preview" ? await cut(file, at, length) : file;
@@ -172,6 +172,9 @@ export default function SjobergMaster() {
       const ing = await sjobergTusUpload(up, API, (sent, total) => { const s = (performance.now() - began) / 1000, speed = s > 1 ? sent / s : 0; setMessage(`Laddar upp ${Math.floor(sent / total * 100)} % · ${(sent / 1024 ** 2).toFixed(0)} av ${(total / 1024 ** 2).toFixed(0)} MB${speed > 0 ? ` · ${(speed / 1024 ** 2).toFixed(1)} MB/s` : ""}`); });
       setPhase("running"); setMessage(mode === "preview" ? "Mastrar utdraget…" : "Mastrar hela kapitlet…");
       const [{ job }, original] = await Promise.all([j<{ job: string }>(`${ing.id}/master`, { method: "POST" }), j<Measure | null>(`${ing.id}/measure`, { method: "POST" }).catch(() => null)]);
+      // Spara-i-arkivet binds till jobbet direkt på servern: kapitlet skapas nu (status mastrar) och slutförs av servern
+      // även om sidan stängs. Webbläsaren behöver inte vara kvar.
+      if (save && mode === "master") await archive({ upload: ing.id, job, duration: ing.duration }, true);
       const t0 = Date.now(); let master: Measure | null = null;
       for (;;) {
         await new Promise(r => setTimeout(r, 2000));
@@ -185,10 +188,9 @@ export default function SjobergMaster() {
       const beforeTrack = mode === "preview" ? await overviewOf(up) : source, afterTrack = await overviewOf(out);
       urls.current.push(afterTrack.url); if (mode === "preview") urls.current.push(beforeTrack.url);
       const result: Done = { mode, start: at, before: beforeTrack, after: afterTrack, master: master!, original, blob: out, upload: ing.id, job, duration: ing.duration };
-      setDone(result); if (mode === "master") setSaved(null);
+      setDone(result);
       setStem(file.name.replace(/\.[^.]+$/, "") + (mode === "preview" ? "_provmaster" : "_master"));
       setPhase("done"); setMessage(""); setWhole(false); setCurrent(0); pendingSeek.current = 0;
-      if (save) await archive(result);
     } catch (e) { setPhase("ready"); setError(e instanceof Error && e.message ? e.message : "Körningen kunde inte slutföras. Försök igen."); }
   }
   useEffect(() => { if (!playing) return; let f: number; const tick = () => { const lead = active.current === "before" ? a.current : b.current; if (lead) setCurrent(lead.currentTime); if (synced && a.current && b.current && !a.current.seeking && !b.current.seeking && Math.abs(a.current.currentTime - b.current.currentTime) > .04) b.current.currentTime = a.current.currentTime; f = requestAnimationFrame(tick); }; f = requestAnimationFrame(tick); return () => cancelAnimationFrame(f); }, [playing, synced]);
@@ -237,6 +239,7 @@ export default function SjobergMaster() {
       <dl className="sj-specgrid"><div><dt>Ljudnivå</dt><dd>−17,5 LUFS ±0,5</dd></div><div><dt>True peak</dt><dd>≤ −3,0 dBTP</dd></div><div><dt>Brusgolv</dt><dd>≤ −80 dBFS</dd></div><div><dt>Format</dt><dd>44,1 kHz / 16 bit mono</dd></div></dl></section>
     <section className="ab-actions" aria-label="Bearbetning"><button className="ab-master" disabled={!file || busy} onClick={() => void run("preview")}>Provmastra utdraget <span>↗</span></button><button className="ab-master" disabled={!file || busy || !metaOk} onClick={() => void run("master", true)}>Mastra hela kapitlet och spara i arkivet <span>→</span></button><button className="ab-secondary" disabled={!file || busy} onClick={() => void run("master")}>Mastra utan att spara</button><p>Provmastra ett utdrag på 5 eller 10 minuter och lyssna innan du mastrar hela kapitlet. Slutmastern kan skilja sig något från utdraget eftersom hela filens nivå bedöms.</p></section>
     <div role="status" aria-live="polite" className="ab-status">{busy && <><span className="ab-spinner" />{message}</>}</div>
+    {saved?.running && busy && <p className="ab-info">Kapitlet är registrerat i ”{saved.title}”. Mastringen och sparandet sker på servern, så du kan stänga sidan. <a href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</a></p>}
     {error && <p role="alert" className="ab-error">{error}</p>}
     {stale && <p className="ab-info">Utdraget har flyttats. Resultatet nedan gäller fortfarande {fmt(done!.start)}–{fmt(done!.start + done!.before.duration)}. Provmastra igen för ett nytt resultat.</p>}
     {!done && <section className="ab-next-step"><p className="ab-eyebrow">03 · JÄMFÖR OCH LADDA NER</p><h2>Här visas ditt resultat.</h2><p>När mastringen är klar kan du lyssna på före och efter, se mätvärdena och ladda ner ljudfilen.</p></section>}
@@ -246,7 +249,7 @@ export default function SjobergMaster() {
       <label className="ab-filename">Filnamn för nedladdning<div><input aria-label="Filnamn för nedladdning" value={stem} maxLength={236} onChange={e => setStem(e.target.value)} spellCheck={false} /><span>.wav</span></div><small>Originalets namn är förifyllt. Du kan ändra det här.</small></label>
       <div className="ab-downloads"><button className="ab-master" onClick={download}>{done.mode === "preview" ? "Ladda ner provmastrat utdrag" : "Ladda ner master"}<span>↓</span></button>{done.mode === "preview" && <button className="ab-secondary" disabled={busy || !metaOk} onClick={() => void run("master", true)}>Nöjd? Mastra hela kapitlet och spara i arkivet</button>}{done.mode === "master" && !saved && <button className="ab-secondary" disabled={busy || !metaOk} onClick={() => void archive(done)}>Spara i arkivet</button>}</div>
       {done.mode === "master" && !saved && !metaOk && <p className="sj-small">Välj bok och kapitel ovan för att spara mastern i arkivet.</p>}
-      {saved && <p className="ab-info">Sparat i arkivet: kapitel {saved.number} – {saved.name} i ”{saved.title}”. Mätningen visas i boken när mastern har lagrats. <a href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</a></p>}
+      {saved && <p className="ab-info">Sparat i arkivet: kapitel {saved.number} – {saved.name} i ”{saved.title}”. {saved.running ? "Mastringen och sparandet sker på servern, så du kan stänga sidan. Kapitlet visas som Mastrar… i boken tills det är klart." : "Mätningen visas i boken när mastern har lagrats."} <a href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</a></p>}
     </section>}
     <p className="ab-retention">Uppladdade filer tas bort från lagringen när de har lästs in. Kapitel som sparas i arkivet finns kvar i 30 dagar efter leverans (första nedladdningen av boken). Provmastringar och mastrar som inte sparas finns bara här, så ladda ner det du vill behålla.</p>
     <footer className="ab-footer"><span>SALTWAVES STUDIO</span><span>En fil. En enhetlig behandling.</span></footer>
