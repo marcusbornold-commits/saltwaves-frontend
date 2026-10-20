@@ -5,7 +5,7 @@ import { STUDIO_COOKIE, studioInviteFile, verifyStudioInvite } from "@/lib/studi
 const PREVIEW_HOST = "studio-preview.saltwaves.studio";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "100.125.138.87"]);
 // Producentlänkar (/sjoberg/lamna/<token>) är öppna: token kontrolleras i API:t, som bara kan ta emot uppladdningar.
-const OPEN = ["/tools/audiobook/studio/invite", "/tools/audiobook/sjoberg/invite", "/api/studio-invite", "/tools/audiobook/sjoberg/lamna", "/api/sjoberg-lamna"];
+const OPEN = ["/tools/audiobook/studio/invite", "/tools/audiobook/sjoberg/invite", "/api/studio-invite", "/tools/audiobook/sjoberg/lamna", "/api/sjoberg-lamna", "/api/sjoberg-health"];
 const PREVIEW_ALLOWED = ["/tools/audiobook/studio", "/tools/audiobook/sjoberg", "/api/audiobook-sjoberg", "/api/sjoberg-portal", "/api/sjoberg-lamna", "/api/audiobook-studio", "/api/studio-invite", "/_next"];
 // Exakta statiska filer som studion använder (Wordmark-emblemet + ikoner). Typsnitt (next/font) ligger under /_next/static.
 const PREVIEW_ASSETS = new Set(["/assets/emblem-ink.png", "/assets/emblem-paper.png", "/favicon.ico", "/icon.png", "/apple-icon.png"]);
@@ -15,7 +15,7 @@ const SJOBERG_PAGE = "/tools/audiobook/sjoberg";
 const SJOBERG_API = [/^\/api\/audiobook-sjoberg\//, /^\/api\/sjoberg-portal\//];
 // Egen domän för Sjöberg-testet (preview-tunneln → localhost:3092). Där finns bara Sjöberg-sidan, dess invite och API.
 const SJOBERG_HOST = "sjoberg.saltwaves.studio";
-const SJOBERG_ALLOWED = [SJOBERG_PAGE, "/api/audiobook-sjoberg", "/api/sjoberg-portal", "/api/sjoberg-lamna", "/api/studio-invite", "/_next"];
+const SJOBERG_ALLOWED = [SJOBERG_PAGE, "/api/audiobook-sjoberg", "/api/sjoberg-portal", "/api/sjoberg-lamna", "/api/sjoberg-health", "/api/studio-invite", "/_next"];
 const notFound = () => new NextResponse("Not found", { status: 404, headers: { "cache-control": "no-store" } }); // så Cloudflare inte cachar 404:or
 const under = (path: string, list: string[]) => list.some(p => path === p || path.startsWith(p + "/"));
 
