@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 // Egen kopia av Wordmark: saltwaves-ui drar med sig hela uppladdningsklienten för podcastsidan i bundlen.
-function Wordmark({ href }: { href: string }) {
+export function Wordmark({ href }: { href: string }) {
   return <a className="nav-brand" href={href} aria-label="Saltwaves.studio"><img src="/assets/emblem-ink.png" alt="Saltwaves emblem" /><span>saltwaves<span style={{ color: "var(--orange)" }}>.studio</span></span></a>;
 }
 export type Check = { id: string; label: string; value: number | string | null; unit: string; requirement: string; pass: boolean };

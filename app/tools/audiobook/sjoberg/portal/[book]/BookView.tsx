@@ -58,7 +58,7 @@ export default function BookView({ id }: { id: string }) {
       <input ref={input} hidden multiple type="file" accept={ACCEPT} onChange={e => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
       <div className="ab-drop" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}><div className="ab-drop-icon">↑</div><p>Dra kapitelfilerna hit</p><span>Varje fil blir ett kapitel och mastras automatiskt mot Audiobook Nordic.<br />Kapitelnumret läses från filnamnet, till exempel ”Kapitel 03.wav”. WAV, MP3, M4A, AIFF eller FLAC, högst 1 000 MB per fil.</span></div>
       {ups.map(u => <div key={u.name} className="sp-grid" style={{ marginTop: 10 }}><div className="sp-row"><strong>{u.name}</strong><span className="sp-small">{u.error ? "" : u.sent < u.total ? `Laddar upp ${Math.round(u.sent / u.total * 100)} %` : "Läser in…"}</span></div>{u.error ? <p className="ab-error">{u.error}</p> : <div className="sp-progress"><span style={{ width: `${u.sent / u.total * 100}%` }} /></div>}</div>)}
-      <p className="sp-small">Vill du lyssna innan? <a href="/tools/audiobook/sjoberg">Provmastra ett utdrag</a> först. Det är valfritt.</p>
+      <p className="sp-small">Vill du lyssna innan? <a href="/tools/audiobook/sjoberg/prov">Provmastra ett utdrag</a> först. Det är valfritt.</p>
     </section>
     {error && <p role="alert" className="ab-error">{error}</p>}
 
