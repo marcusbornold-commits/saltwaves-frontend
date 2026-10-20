@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { portalTusUpload, ACCEPT } from "@/lib/portal-upload";
 import { Shell, Spec, dateSv } from "../../portal/ui";
 type Info = { title: string; narrator: string; open: boolean; expires: string };
-type Up = { name: string; sent: number; total: number; state: "up" | "done" | "error"; error?: string };
+type Up = { name: string; sent: number; total: number; state: "up" | "check" | "done" | "rejected" | "error"; error?: string; advice?: string[] };
 export default function Drop({ token }: { token: string }) {
   const api = `/api/sjoberg-lamna/${token}`;
   const [info, setInfo] = useState<Info | null>(null), [error, setError] = useState(""), [ups, setUps] = useState<Up[]>([]);
@@ -17,7 +17,17 @@ export default function Drop({ token }: { token: string }) {
         const path = await portalTusUpload(f, `${api}/tus`, (sent, total) => set({ sent, total }));
         const r = await fetch(`${api}/klar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path, filename: f.name }) });
         const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "Filen kunde inte tas emot.");
-        set({ state: "done" });
+        set({ state: "check" });
+        if (d.id) void (async () => { // vänta på kontrollen mot specen (tar någon minut)
+          for (let i = 0; i < 450; i++) {
+            await new Promise(r => setTimeout(r, 4000));
+            const s = await fetch(`${api}/status/${d.id}`).then(r => r.ok ? r.json() : null).catch(() => null);
+            if (!s || s.status === "processing" || s.status === "uploaded") continue;
+            if (s.status === "approved") return set({ state: "done" });
+            if (s.status === "rejected") return set({ state: "rejected", advice: s.advice });
+            return set({ state: "error", error: s.error || "Filen kunde inte kontrolleras. Ladda upp den igen." });
+          }
+        })(); else set({ state: "done" });
       } catch (e) { set({ state: "error", error: (e as Error).message }); }
     }
   }
@@ -28,7 +38,7 @@ export default function Drop({ token }: { token: string }) {
     {info?.open && <section className="ab-workspace"><div className="ab-filebar"><div><span className="ab-eyebrow">LADDA UPP</span><h2>Välj kapitelfiler</h2></div><button className="ab-secondary" onClick={() => input.current?.click()}>Välj filer</button></div>
       <input ref={input} hidden multiple type="file" accept={ACCEPT} onChange={e => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
       <div className="ab-drop" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}><div className="ab-drop-icon">↑</div><p>Dra kapitelfilerna hit</p><span>En fil per kapitel, med kapitelnumret i filnamnet. WAV 44,1 kHz / 16 bit mono rekommenderas, högst 1 000 MB per fil.<br />Uppladdningen är krypterad och går direkt till lagringen. Länken gäller till {dateSv(info.expires)}.</span></div>
-      {ups.map(u => <div key={u.name} className="sp-grid" style={{ marginTop: 10 }}><div className="sp-row"><strong>{u.name}</strong><span className={`sp-small ${u.state === "done" ? "sp-ok" : u.state === "error" ? "sp-bad" : ""}`}>{u.state === "done" ? "✓ Mottagen av förlaget" : u.state === "error" ? u.error : u.sent < u.total ? `Laddar upp ${Math.round(u.sent / u.total * 100)} %` : "Tar emot…"}</span></div>{u.state === "up" && <div className="sp-progress"><span style={{ width: `${u.sent / u.total * 100}%` }} /></div>}</div>)}
+      {ups.map(u => <div key={u.name} className="sp-grid" style={{ marginTop: 10 }}><div className="sp-row"><strong>{u.name}</strong><span className={`sp-small ${u.state === "done" ? "sp-ok" : u.state === "error" || u.state === "rejected" ? "sp-bad" : ""}`}>{u.state === "done" ? "✓ Godkänd och mottagen av förlaget" : u.state === "check" ? "Mottagen, kontrolleras mot specen…" : u.state === "rejected" ? "✕ Underkänd, inte sparad" : u.state === "error" ? u.error : u.sent < u.total ? `Laddar upp ${Math.round(u.sent / u.total * 100)} %` : "Tar emot…"}</span></div>{u.state === "rejected" && <ul className="sp-checks">{(u.advice || []).map(a => <li key={a} className="sp-bad"><span className="sp-dot" /><span>{a}</span></li>)}<li className="sp-small">Justera filen och ladda upp den igen via den här länken.</li></ul>}{u.state === "up" && <div className="sp-progress"><span style={{ width: `${u.sent / u.total * 100}%` }} /></div>}</div>)}
     </section>}
     <Spec />
     <p className="ab-retention">Du kan bara ladda upp via den här länken. Uppladdade filer kan inte visas, spelas upp eller laddas ner härifrån.</p>

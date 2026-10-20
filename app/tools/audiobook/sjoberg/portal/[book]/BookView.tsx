@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { portalTusUpload, ACCEPT } from "@/lib/portal-upload";
-import { ConfirmDelete, Shell, Spec, STATUS, dateSv, reason, val, type Check } from "../ui";
+import { ConfirmDelete, Shell, Spec, STATUS, dateSv, val, type Check } from "../ui";
+import { adviceLine } from "@/lib/sjoberg-advice";
 type Chapter = { id: string; number: number; name: string; filename: string; source: "sjoberg" | "producer"; status: string; checks: Check[] | null; duration: number | null; error: string | null; stored: boolean };
 type Link = { id: string; label: string; expires_at: string; closed_at: string | null; open: boolean };
 type Book = { id: string; title: string; narrator: string; isbn: string | null; is_test: boolean; delivered_at: string | null; expires_at: string | null };
@@ -72,7 +73,7 @@ export default function BookView({ id }: { id: string }) {
         <td><input className="sp-name" aria-label="Kapitelnamn" maxLength={200} defaultValue={c.name} onBlur={e => { const n = e.target.value.trim(); if (n && n !== c.name) void patch(c, { name: n }); }} onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }} /><div className="sp-small">{c.filename}{c.duration ? ` · ${mins(c.duration)}` : ""}</div></td>
         <td>{c.source === "producer" ? "Producent" : "Sjöberg"}<div className="sp-small">{c.source === "producer" ? "mäts, mastras inte" : "mastras"}</div></td>
         <td><span className={`sp-pill ${cls}`}>{c.status === "processing" && <span className="ab-spinner" />}{st}</span>{c.error && <div className="sp-small sp-bad">{c.error}</div>}</td>
-        <td>{c.checks ? <ul className="sp-checks">{c.checks.map(k => <li key={k.id} className={k.pass ? "sp-ok" : "sp-bad"} title={k.pass ? "" : reason(k)}><span className="sp-dot" /><span>{k.pass ? `${k.label} ${val(k)}` : reason(k).replace(/^./, s => s.toUpperCase())}</span></li>)}</ul> : <span className="sp-small">—</span>}</td>
+        <td>{c.checks ? <ul className="sp-checks">{c.checks.map(k => <li key={k.id} className={k.pass ? "sp-ok" : "sp-bad"} ><span className="sp-dot" /><span>{k.pass ? `${k.label} ${val(k)}` : adviceLine(k)}</span></li>)}</ul> : <span className="sp-small">—</span>}</td>
         <td className="sp-row">{c.stored && <a className="sp-small" href={`${API}/chapters/${c.id}/audio`} target="_blank" rel="noreferrer">Lyssna</a>}{c.status !== "processing" && <button className="ab-secondary" onClick={() => setDel(c)}>Ta bort</button>}</td></tr>; })}</tbody></table></div>}
       <div className="ab-downloads"><a className="ab-master" aria-disabled={!approved} href={approved ? `${API}/books/${id}/zip` : undefined} onClick={() => setTimeout(() => void load(), 1500)}>Ladda ner hela boken (zip) <span>↓</span></a><a className="ab-secondary" href={`${API}/books/${id}/rapport.csv`}>Mätrapport (CSV)</a></div>
       <p className="sp-small">Zip-filen innehåller alla godkända kapitel, namngivna som Titel_01_Kapitelnamn.wav, och mätrapporten.</p>
