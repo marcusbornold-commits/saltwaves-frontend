@@ -2,7 +2,7 @@
 // Sjöberg förlag: EarSelect-sidans flöde (provmastra utdrag → lyssna/jämför → mastra hela kapitlet) utan reglage.
 // Fast spec "Audiobook Nordic" och den låsta kedjan med pausexpander; allt ljud laddas upp med tus till lagringen.
 import { useEffect, useRef, useState } from "react";
-import { Wordmark } from "./portal/ui";
+import { SjNav, Wordmark } from "./portal/ui";
 import { wavOverview, type Overview } from "@/lib/audiobook-wave";
 import { sjobergTusUpload } from "@/lib/sjoberg-upload";
 import "../audiobook.css";
@@ -166,6 +166,7 @@ export default function SjobergMaster() {
 
   return <main className="ab-studio" lang="sv">
     <header className="ab-header"><Wordmark href="/tools/audiobook/sjoberg/portal" /><span className="ab-badge">SJÖBERG FÖRLAG · AUDIOBOOK</span></header>
+    <SjNav active="prov" />
     <div className="ab-heading"><div><p className="ab-eyebrow"><a href="/tools/audiobook/sjoberg/portal">← Till portalen</a> · PROVLYSSNA · JÄMFÖR · MASTRA</p><h1>Audiobook<span>.</span></h1></div><p>Lyssna på originalet, provmastra ett utdrag och jämför före och efter. När du är nöjd mastrar du hela kapitlet.</p></div>
     <ol className="ab-steps" aria-label="Så fungerar det"><li><span>1</span><div><strong>Ladda upp och lyssna</strong><p>Välj din fil och lyssna på originalet.</p></div></li><li><span>2</span><div><strong>Provmastra ett utdrag</strong><p>Välj ett avsnitt och hör resultatet.</p></div></li><li><span>3</span><div><strong>Mastra hela kapitlet</strong><p>Jämför och ladda ner den färdiga mastern.</p></div></li></ol>
     <section className="ab-workspace" aria-label="Ljudbok och provfönster"><div className="ab-filebar"><div><span className="ab-eyebrow">01 · LADDA UPP OCH LYSSNA</span><h2>{name || "Välj din ljudfil"}</h2></div><button className="ab-secondary" disabled={busy} onClick={() => input.current?.click()}>{name ? "Byt fil" : "Välj ljudfil"}</button></div>

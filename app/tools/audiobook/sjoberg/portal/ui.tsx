@@ -12,7 +12,7 @@ export const reason = (c: Check) => `${c.label.toLowerCase()} ${val(c)}, krav ${
 export const STATUS: Record<string, [string, string]> = { uploaded: ["Uppladdad", "sp-wait"], processing: ["Mäts / mastras", "sp-wait"], approved: ["Godkänd", "sp-ok"], rejected: ["Underkänd", "sp-bad"], failed: ["Fel", "sp-bad"] };
 export const dateSv = (s: string) => new Date(s).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" });
 export function Shell({ children, badge = "SJÖBERG FÖRLAG · PORTAL", home = "/tools/audiobook/sjoberg/portal" }: { children: React.ReactNode; badge?: string; home?: string }) {
-  return <main className="ab-studio" lang="sv"><header className="ab-header"><Wordmark href={home} /><span className="ab-badge">{badge}</span></header>{children}
+  return <main className="ab-studio" lang="sv"><header className="ab-header"><Wordmark href={home} /><span className="ab-badge">{badge}</span></header><SjNav active="portal" />{children}
     <footer className="ab-footer"><span>SALTWAVES STUDIO</span><span>Audiobook Nordic · −17,5 LUFS · ≤ −3 dBTP · ≤ −80 dBFS · 44,1 kHz/16 bit mono</span></footer></main>;
 }
 export function Spec() {
@@ -34,4 +34,11 @@ export function ConfirmDelete({ title, what, expect, alt, onCancel, onConfirm }:
       {err && <p role="alert" className="ab-error">{err}</p>}
       <div className="sp-row" style={{ justifyContent: "flex-end", gap: 10, marginTop: 14 }}><button className="ab-secondary" disabled={busy} onClick={onCancel}>Avbryt</button><button className="sp-danger" disabled={!ok || busy} onClick={() => void go()}>{busy ? "Raderar…" : "Radera permanent"}</button></div>
     </div></div>;
+}
+
+// Toppnavigering mellan portalen och den fristående mastringssidan.
+export function SjNav({ active }: { active: "portal" | "prov" }) {
+  const tabs = [["portal", "Portal", "/tools/audiobook/sjoberg/portal"], ["prov", "Mastringssida", "/tools/audiobook/sjoberg/prov"]] as const;
+  return <nav className="sj-nav" aria-label="Sjöberg"><div className="sj-tabs">{tabs.map(([k, l, h]) => <a key={k} href={h} className={k === active ? "sj-tab sj-tab-on" : "sj-tab"} aria-current={k === active ? "page" : undefined}>{l}</a>)}</div>
+    {active === "prov" && <p className="sj-nav-hint">Fristående sida för att testa enskilda filer. Inget sparas i arkivet.</p>}</nav>;
 }

@@ -4,3 +4,10 @@
 .sj-specgrid dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.65}
 .sj-specgrid dd{margin:6px 0 0;font-weight:600;white-space:nowrap}
 @media (max-width:760px){.sj-spec{grid-template-columns:1fr}.sj-specgrid{grid-template-columns:repeat(2,1fr)}}
+
+.sj-nav{margin:0 0 28px}
+.sj-tabs{display:inline-flex;gap:4px;padding:4px;border:1px solid rgba(0,0,0,.12);border-radius:999px;background:rgba(255,255,255,.6)}
+.sj-tab{padding:8px 18px;border-radius:999px;font-weight:600;text-decoration:none;color:inherit;opacity:.7}
+.sj-tab:hover{opacity:1}
+.sj-tab-on{background:var(--orange,#e0623c);color:#fff;opacity:1}
+.sj-nav-hint{margin:8px 0 0 6px;font-size:.85rem;opacity:.7}
