@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 /* eslint-disable @next/next/no-img-element */
 // Egen kopia av Wordmark: saltwaves-ui drar med sig hela uppladdningsklienten för podcastsidan i bundlen.
 export function Wordmark({ href }: { href: string }) {
@@ -39,6 +40,6 @@ export function ConfirmDelete({ title, what, expect, alt, onCancel, onConfirm }:
 // Toppnavigering mellan portalen och den fristående mastringssidan.
 export function SjNav({ active }: { active: "portal" | "prov" }) {
   const tabs = [["portal", "Portal", "/tools/audiobook/sjoberg/portal"], ["prov", "Mastringssida", "/tools/audiobook/sjoberg/prov"]] as const;
-  return <nav className="sj-nav" aria-label="Sjöberg"><div className="sj-tabs">{tabs.map(([k, l, h]) => <a key={k} href={h} className={k === active ? "sj-tab sj-tab-on" : "sj-tab"} aria-current={k === active ? "page" : undefined}>{l}</a>)}</div>
-    {active === "prov" && <p className="sj-nav-hint">Provmastra enskilda filer och spara hela kapitel direkt i en bok i arkivet.</p>}</nav>;
+  return <nav className="sj-nav" aria-label="Sjöberg"><div className="sj-tabs">{tabs.map(([k, l, h]) => <Link key={k} href={h} prefetch className={k === active ? "sj-tab sj-tab-on" : "sj-tab"} aria-current={k === active ? "page" : undefined}>{l}</Link>)}</div>
+    <p className={active === "prov" ? "sj-nav-hint sj-nav-hint-on" : "sj-nav-hint"} aria-hidden={active !== "prov"}>Provmastra enskilda filer och spara hela kapitel direkt i en bok i arkivet.</p></nav>;
 }

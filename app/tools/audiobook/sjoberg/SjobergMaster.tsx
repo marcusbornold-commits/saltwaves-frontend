@@ -2,6 +2,7 @@
 // Sjöberg förlag: EarSelect-sidans flöde (provmastra utdrag → lyssna/jämför → mastra hela kapitlet) utan reglage.
 // Fast spec "Audiobook Nordic" och den låsta kedjan med pausexpander; allt ljud laddas upp med tus till lagringen.
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { SjNav, Wordmark } from "./portal/ui";
 import { wavOverview, type Overview } from "@/lib/audiobook-wave";
 import { sjobergTusUpload } from "@/lib/sjoberg-upload";
@@ -239,7 +240,7 @@ export default function SjobergMaster() {
       <dl className="sj-specgrid"><div><dt>Ljudnivå</dt><dd>−17,5 LUFS ±0,5</dd></div><div><dt>True peak</dt><dd>≤ −3,0 dBTP</dd></div><div><dt>Brusgolv</dt><dd>≤ −80 dBFS</dd></div><div><dt>Format</dt><dd>44,1 kHz / 16 bit mono</dd></div></dl></section>
     <section className="ab-actions" aria-label="Bearbetning"><button className="ab-master" disabled={!file || busy} onClick={() => void run("preview")}>Provmastra utdraget <span>↗</span></button><button className="ab-master" disabled={!file || busy || !metaOk} onClick={() => void run("master", true)}>Mastra hela kapitlet och spara i arkivet <span>→</span></button><button className="ab-secondary" disabled={!file || busy} onClick={() => void run("master")}>Mastra utan att spara</button><p>Provmastra ett utdrag på 5 eller 10 minuter och lyssna innan du mastrar hela kapitlet. Slutmastern kan skilja sig något från utdraget eftersom hela filens nivå bedöms.</p></section>
     <div role="status" aria-live="polite" className="ab-status">{busy && <><span className="ab-spinner" />{message}</>}</div>
-    {saved?.running && busy && <p className="ab-info">Kapitlet är registrerat i ”{saved.title}”. Mastringen och sparandet sker på servern, så du kan stänga sidan. <a href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</a></p>}
+    {saved?.running && busy && <p className="ab-info">Kapitlet är registrerat i ”{saved.title}”. Mastringen och sparandet sker på servern, så du kan stänga sidan. <Link href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</Link></p>}
     {error && <p role="alert" className="ab-error">{error}</p>}
     {stale && <p className="ab-info">Utdraget har flyttats. Resultatet nedan gäller fortfarande {fmt(done!.start)}–{fmt(done!.start + done!.before.duration)}. Provmastra igen för ett nytt resultat.</p>}
     {!done && <section className="ab-next-step"><p className="ab-eyebrow">03 · JÄMFÖR OCH LADDA NER</p><h2>Här visas ditt resultat.</h2><p>När mastringen är klar kan du lyssna på före och efter, se mätvärdena och ladda ner ljudfilen.</p></section>}
@@ -249,7 +250,7 @@ export default function SjobergMaster() {
       <label className="ab-filename">Filnamn för nedladdning<div><input aria-label="Filnamn för nedladdning" value={stem} maxLength={236} onChange={e => setStem(e.target.value)} spellCheck={false} /><span>.wav</span></div><small>Originalets namn är förifyllt. Du kan ändra det här.</small></label>
       <div className="ab-downloads"><button className="ab-master" onClick={download}>{done.mode === "preview" ? "Ladda ner provmastrat utdrag" : "Ladda ner master"}<span>↓</span></button>{done.mode === "preview" && <button className="ab-secondary" disabled={busy || !metaOk} onClick={() => void run("master", true)}>Nöjd? Mastra hela kapitlet och spara i arkivet</button>}{done.mode === "master" && !saved && <button className="ab-secondary" disabled={busy || !metaOk} onClick={() => void archive(done)}>Spara i arkivet</button>}</div>
       {done.mode === "master" && !saved && !metaOk && <p className="sj-small">Välj bok och kapitel ovan för att spara mastern i arkivet.</p>}
-      {saved && <p className="ab-info">Sparat i arkivet: kapitel {saved.number} – {saved.name} i ”{saved.title}”. {saved.running ? "Mastringen och sparandet sker på servern, så du kan stänga sidan. Kapitlet visas som Mastrar… i boken tills det är klart." : "Mätningen visas i boken när mastern har lagrats."} <a href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</a></p>}
+      {saved && <p className="ab-info">Sparat i arkivet: kapitel {saved.number} – {saved.name} i ”{saved.title}”. {saved.running ? "Mastringen och sparandet sker på servern, så du kan stänga sidan. Kapitlet visas som Mastrar… i boken tills det är klart." : "Mätningen visas i boken när mastern har lagrats."} <Link href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</Link></p>}
     </section>}
     <p className="ab-retention">Uppladdade filer tas bort från lagringen när de har lästs in. Kapitel som sparas i arkivet finns kvar i 30 dagar efter leverans (första nedladdningen av boken). Provmastringar och mastrar som inte sparas finns bara här, så ladda ner det du vill behålla.</p>
     <footer className="ab-footer"><span>SALTWAVES STUDIO</span><span>En fil. En enhetlig behandling.</span></footer>
