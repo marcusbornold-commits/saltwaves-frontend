@@ -5,13 +5,13 @@ import { STUDIO_COOKIE, studioInviteFile, verifyStudioInvite } from "@/lib/studi
 const PREVIEW_HOST = "studio-preview.saltwaves.studio";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "100.125.138.87"]);
 const OPEN = ["/tools/audiobook/studio/invite", "/tools/audiobook/sjoberg/invite", "/api/studio-invite"];
-const PREVIEW_ALLOWED = ["/tools/audiobook/studio", "/tools/audiobook/sjoberg", "/api/audiobook-studio", "/api/studio-invite", "/_next"];
+const PREVIEW_ALLOWED = ["/tools/audiobook/studio", "/tools/audiobook/sjoberg", "/api/audiobook-sjoberg", "/api/audiobook-studio", "/api/studio-invite", "/_next"];
 // Exakta statiska filer som studion använder (Wordmark-emblemet + ikoner). Typsnitt (next/font) ligger under /_next/static.
 const PREVIEW_ASSETS = new Set(["/assets/emblem-ink.png", "/assets/emblem-paper.png", "/favicon.ico", "/icon.png", "/apple-icon.png"]);
 
-// Sjöberg-invites (scope "sjoberg") når bara Sjöberg-sidan och de API-anrop den gör: uppladdning, master, jobbstatus, masterfilen.
+// Sjöberg-invites (scope "sjoberg") når bara Sjöberg-sidan och dess eget API (/api/audiobook-sjoberg, vitlistade och rensade anrop).
 const SJOBERG_PAGE = "/tools/audiobook/sjoberg";
-const SJOBERG_API = [/^\/api\/audiobook-studio\/(tus|upload|ingest)$/, /^\/api\/audiobook-studio\/[A-Za-z0-9_-]+\/master$/, /^\/api\/audiobook-studio\/jobs\/[a-f0-9]+$/, /^\/api\/audiobook-studio\/[A-Za-z0-9_-]+\/audio\/master$/];
+const SJOBERG_API = [/^\/api\/audiobook-sjoberg\//];
 
 export function proxy(req: NextRequest) {
   if (!studioInviteFile()) return NextResponse.next();
@@ -22,12 +22,12 @@ export function proxy(req: NextRequest) {
   if ((host === PREVIEW_HOST || viaCloudflare) && !PREVIEW_ASSETS.has(path) && !PREVIEW_ALLOWED.some(p => path === p || path.startsWith(p + "/")))
     return new NextResponse("Not found", { status: 404, headers: { "cache-control": "no-store" } }); // så Cloudflare inte cachar 404:or
   const sjPage = path === SJOBERG_PAGE || path.startsWith(SJOBERG_PAGE + "/");
-  const gated = sjPage || path === "/tools/audiobook/studio" || path.startsWith("/tools/audiobook/studio/") || path.startsWith("/api/audiobook-studio");
+  const gated = sjPage || path === "/tools/audiobook/studio" || path.startsWith("/tools/audiobook/studio/") || path.startsWith("/api/audiobook-studio") || path.startsWith("/api/audiobook-sjoberg");
   if (!gated || OPEN.some(p => path === p || path.startsWith(p + "/"))) return NextResponse.next();
   // Marcus lokalt / via Tailscale (aldrig via Cloudflare).
   if (!viaCloudflare && LOCAL_HOSTS.has(host)) return NextResponse.next();
   const inv = verifyStudioInvite(req.cookies.get(STUDIO_COOKIE)?.value);
-  if (inv?.scope === "studio" && !sjPage) return NextResponse.next();
+  if (inv?.scope === "studio" && !sjPage && !path.startsWith("/api/audiobook-sjoberg")) return NextResponse.next();
   if (inv?.scope === "sjoberg" && (sjPage || SJOBERG_API.some(r => r.test(path)))) return NextResponse.next();
   if (path.startsWith("/api/")) return NextResponse.json({ error: "invite required" }, { status: 401 });
   return new NextResponse(

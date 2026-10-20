@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 // Egen neutral metadata för Sjöberg-sidan (ingen podcast-metadata från rotlayouten).
 const title = "Saltwaves – Ljudboksmastering";
-const description = "Automatisk mastering av ljudböcker enligt Storytels krav.";
+const description = "Automatisk mastering av ljudböcker enligt specen Audiobook Nordic.";
 export const metadata: Metadata = {
   title, description, keywords: [],
   robots: { index: false, follow: false },
