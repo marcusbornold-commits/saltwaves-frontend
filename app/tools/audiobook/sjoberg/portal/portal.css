@@ -25,3 +25,10 @@
 .sp-progress span{display:block;height:100%;background:currentColor}
 .sp-small{font-size:13px;opacity:.75}
 @media (max-width:760px){.sp-form{grid-template-columns:1fr}.sp-table thead{display:none}.sp-table td{display:block;border:0;padding:4px 0}.sp-table tr{display:block;border-top:1px solid rgba(127,127,127,.3);padding:10px 0}}
+
+.sp-modal-bg{position:fixed;inset:0;background:rgba(10,20,30,.55);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.sp-modal{background:#fff;color:#111;border-radius:14px;max-width:480px;width:100%;padding:24px 26px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.sp-modal h2{margin:4px 0 10px}.sp-modal label{display:grid;gap:6px;margin-top:12px}.sp-modal input{width:100%;box-sizing:border-box}
+.sp-danger{background:#b4321f;color:#fff;border:0;border-radius:999px;padding:10px 18px;font-weight:600;cursor:pointer}
+.sp-danger:disabled{background:#d9b3ad;cursor:not-allowed}
+.sp-dangerzone{margin-top:28px;border-top:1px solid rgba(180,50,31,.3);padding-top:18px}

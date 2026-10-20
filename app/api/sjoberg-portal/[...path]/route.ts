@@ -8,6 +8,16 @@ export const maxDuration = 3600;
 const CH_FIELDS = "id, number, name, original_filename, source, status, checks, duration_s, error, created_at, storage_path, link_id";
 const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 type Ch = { id: string; number: number; name: string; original_filename: string; source: string; status: string; checks: Check[] | null; duration_s: number | null; error: string | null; created_at: string; storage_path: string | null; link_id: string | null };
+const norm = (v: unknown) => String(v ?? "").normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("sv-SE");
+async function removeFolder(prefix: string) { // städar även filer som inte finns i tabellen
+  const sb = db();
+  for (let i = 0; i < 20; i++) {
+    const { data } = await sb.storage.from(BUCKET).list(prefix, { limit: 1000 });
+    const files = (data || []).filter(f => f.id).map(f => `${prefix}/${f.name}`);
+    if (!files.length) return;
+    const { error } = await sb.storage.from(BUCKET).remove(files); if (error) throw new Error("storage");
+  }
+}
 const pub = (c: Ch) => ({ id: c.id, number: c.number, name: c.name, filename: c.original_filename, source: c.source, status: c.status, checks: c.checks, duration: c.duration_s, error: c.error, created: c.created_at, stored: !!c.storage_path });
 
 async function book(id: string) {
@@ -31,7 +41,7 @@ async function deliver(id: string, b: { delivered_at: string | null }) {
 
 async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const p = (await ctx.params).path, m = req.method;
-  const body = async () => (m === "POST" || m === "PATCH") ? await req.json().catch(() => ({})) as Record<string, unknown> : {};
+  const body = async () => (m === "POST" || m === "PATCH" || m === "DELETE") ? await req.json().catch(() => ({})) as Record<string, unknown> : {};
   try {
     const sb = db();
     if (p.length === 1 && p[0] === "books") {
@@ -62,6 +72,20 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         if (x.narrator !== undefined) patch.narrator = str(x.narrator, 200);
         if (x.isbn !== undefined) patch.isbn = str(x.isbn, 32).replace(/[^0-9Xx-]/g, "") || null;
         await sb.from("sjoberg_books").update(patch).eq("id", b.id); return Response.json({ ok: true }, { headers: noStore });
+      }
+      if (p.length === 2 && m === "DELETE") {
+        const x = await body();
+        if (norm(x.confirm) !== norm(b.title)) return fail("Skriv bokens titel exakt för att radera.", 400);
+        const ch = await chapters(b.id);
+        if (ch.some(c => c.status === "processing")) return fail("Vänta tills alla kapitel är klara.", 409);
+        const paths = ch.map(c => c.storage_path).filter(Boolean) as string[];
+        if (paths.length) { const { error } = await sb.storage.from(BUCKET).remove(paths); if (error) throw new Error("storage"); }
+        await removeFolder(`${SJ_FOLDER}/${b.id}`);
+        const e1 = (await sb.from("sjoberg_chapters").delete().eq("book_id", b.id)).error;
+        const e2 = (await sb.from("sjoberg_upload_links").delete().eq("book_id", b.id)).error;
+        const e3 = (await sb.from("sjoberg_books").delete().eq("id", b.id).eq("tenant", TENANT)).error;
+        if (e1 || e2 || e3) throw new Error("db");
+        return Response.json({ ok: true }, { headers: noStore });
       }
       if (p.length === 3 && p[2] === "tus" && m === "POST") { const x = await body(); return tusGrant(SJ_FOLDER, str(x.filename, 255), Number(x.size)); }
       if (p.length === 3 && p[2] === "chapters" && m === "POST") {
@@ -101,8 +125,13 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         await sb.from("sjoberg_chapters").update(patch).eq("id", c.id); return Response.json({ ok: true }, { headers: noStore });
       }
       if (p.length === 2 && m === "DELETE") {
+        const x = await body(); const typed = norm(x.confirm);
+        if (!typed || (typed !== norm(c.name) && typed !== String(c.number))) return fail("Skriv kapitlets namn eller nummer exakt för att radera.", 400);
         if (c.status === "processing") return fail("Vänta tills kapitlet är klart.", 409);
-        if (c.storage_path) await sb.storage.from(BUCKET).remove([c.storage_path]);
+        const { data: objs } = await sb.storage.from(BUCKET).list(`${SJ_FOLDER}/${c.book_id}`, { limit: 100, search: c.id });
+        const paths = new Set((objs || []).filter(o => o.name.startsWith(c.id + ".")).map(o => `${SJ_FOLDER}/${c.book_id}/${o.name}`));
+        if (c.storage_path) paths.add(c.storage_path);
+        if (paths.size) { const { error } = await sb.storage.from(BUCKET).remove([...paths]); if (error) throw new Error("storage"); }
         await sb.from("sjoberg_chapters").delete().eq("id", c.id); return Response.json({ ok: true }, { headers: noStore });
       }
       if (p.length === 3 && p[2] === "audio" && m === "GET" && c.storage_path) {

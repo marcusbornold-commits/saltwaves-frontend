@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { portalTusUpload, ACCEPT } from "@/lib/portal-upload";
-import { Shell, Spec, STATUS, dateSv, reason, val, type Check } from "../ui";
+import { ConfirmDelete, Shell, Spec, STATUS, dateSv, reason, val, type Check } from "../ui";
 type Chapter = { id: string; number: number; name: string; filename: string; source: "sjoberg" | "producer"; status: string; checks: Check[] | null; duration: number | null; error: string | null; stored: boolean };
 type Link = { id: string; label: string; expires_at: string; closed_at: string | null; open: boolean };
 type Book = { id: string; title: string; narrator: string; isbn: string | null; is_test: boolean; delivered_at: string | null; expires_at: string | null };
@@ -13,6 +13,7 @@ const mins = (s: number | null) => s ? `${Math.floor(s / 60)}:${String(Math.roun
 export default function BookView({ id }: { id: string }) {
   const [book, setBook] = useState<Book | null>(null), [chapters, setChapters] = useState<Chapter[]>([]), [links, setLinks] = useState<Link[]>([]);
   const [error, setError] = useState(""), [ups, setUps] = useState<Up[]>([]), [newLink, setNewLink] = useState(""), [label, setLabel] = useState(""), [days, setDays] = useState(14);
+  const [del, setDel] = useState<Chapter | "book" | null>(null);
   const input = useRef<HTMLInputElement>(null);
   async function load() {
     const r = await fetch(`${API}/books/${id}`); const d = await r.json().catch(() => ({}));
@@ -40,7 +41,10 @@ export default function BookView({ id }: { id: string }) {
     const r = await fetch(`${API}/chapters/${c.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     if (!r.ok) setError((await r.json().catch(() => ({}))).error || "Ändringen sparades inte."); await load();
   }
-  async function remove(c: Chapter) { if (!confirm(`Ta bort kapitel ${c.number} – ${c.name}?`)) return; await fetch(`${API}/chapters/${c.id}`, { method: "DELETE" }); await load(); }
+  async function remove(url: string, confirm: string) {
+    const r = await fetch(url, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm }) });
+    if (!r.ok) return (await r.json().catch(() => ({}))).error || "Raderingen misslyckades.";
+  }
   async function makeLink() {
     const r = await fetch(`${API}/books/${id}/links`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label, days }) });
     const d = await r.json().catch(() => ({})); if (!r.ok) { setError(d.error || "Länken kunde inte skapas."); return; }
@@ -69,7 +73,7 @@ export default function BookView({ id }: { id: string }) {
         <td>{c.source === "producer" ? "Producent" : "Sjöberg"}<div className="sp-small">{c.source === "producer" ? "mäts, mastras inte" : "mastras"}</div></td>
         <td><span className={`sp-pill ${cls}`}>{c.status === "processing" && <span className="ab-spinner" />}{st}</span>{c.error && <div className="sp-small sp-bad">{c.error}</div>}</td>
         <td>{c.checks ? <ul className="sp-checks">{c.checks.map(k => <li key={k.id} className={k.pass ? "sp-ok" : "sp-bad"} title={k.pass ? "" : reason(k)}><span className="sp-dot" /><span>{k.pass ? `${k.label} ${val(k)}` : reason(k).replace(/^./, s => s.toUpperCase())}</span></li>)}</ul> : <span className="sp-small">—</span>}</td>
-        <td className="sp-row">{c.stored && <a className="sp-small" href={`${API}/chapters/${c.id}/audio`} target="_blank" rel="noreferrer">Lyssna</a>}{c.status !== "processing" && <button className="ab-secondary" onClick={() => void remove(c)}>Ta bort</button>}</td></tr>; })}</tbody></table></div>}
+        <td className="sp-row">{c.stored && <a className="sp-small" href={`${API}/chapters/${c.id}/audio`} target="_blank" rel="noreferrer">Lyssna</a>}{c.status !== "processing" && <button className="ab-secondary" onClick={() => setDel(c)}>Ta bort</button>}</td></tr>; })}</tbody></table></div>}
       <div className="ab-downloads"><a className="ab-master" aria-disabled={!approved} href={approved ? `${API}/books/${id}/zip` : undefined} onClick={() => setTimeout(() => void load(), 1500)}>Ladda ner hela boken (zip) <span>↓</span></a><a className="ab-secondary" href={`${API}/books/${id}/rapport.csv`}>Mätrapport (CSV)</a></div>
       <p className="sp-small">Zip-filen innehåller alla godkända kapitel, namngivna som Titel_01_Kapitelnamn.wav, och mätrapporten.</p>
     </section>
@@ -81,6 +85,9 @@ export default function BookView({ id }: { id: string }) {
       {newLink && <div className="sp-grid" style={{ marginTop: 12 }}><p className="ab-info">Kopiera länken nu. Av säkerhetsskäl visas den bara en gång.</p><div className="sp-row"><code className="sp-new">{newLink}</code><button className="ab-secondary" onClick={() => void navigator.clipboard?.writeText(newLink)}>Kopiera</button></div></div>}
       {links.length > 0 && <div className="sp-links" style={{ marginTop: 14 }}>{links.map(l => <div key={l.id} className="sp-link"><div><strong>{l.label || "Producentlänk"}</strong><div className="sp-small">{l.closed_at ? `Stängd ${dateSv(l.closed_at)}` : l.open ? `Öppen till ${dateSv(l.expires_at)}` : `Gick ut ${dateSv(l.expires_at)}`}</div></div>{l.open ? <button className="ab-secondary" onClick={() => void closeLink(l)}>Stäng länken</button> : <span className={`sp-pill ${l.closed_at ? "sp-bad" : "sp-wait"}`}>{l.closed_at ? "Stängd" : "Utgången"}</span>}</div>)}</div>}
     </section>
+    <section className="sp-dangerzone"><p className="ab-eyebrow sp-bad">TA BORT BOKEN</p><p className="sp-small">Raderar boken, alla kapitel och filer samt uppladdningslänkarna permanent.</p><button className="ab-secondary" disabled={chapters.some(c => c.status === "processing")} onClick={() => setDel("book")}>Ta bort boken</button></section>
+    {del === "book" && <ConfirmDelete title={`Ta bort ”${book.title}”?`} what={`Boken, ${chapters.length} kapitel med alla filer och uppladdningslänkarna raderas.`} expect={book.title} onCancel={() => setDel(null)} onConfirm={async t => { const e = await remove(`${API}/books/${id}`, t); if (e) return e; location.href = "/tools/audiobook/sjoberg/portal"; }} />}
+    {del && del !== "book" && <ConfirmDelete title={`Ta bort kapitel ${del.number}?`} what={`Kapitel ${del.number} – ${del.name} och dess fil raderas.`} expect={del.name} alt={String(del.number)} onCancel={() => setDel(null)} onConfirm={async t => { const e = await remove(`${API}/chapters/${del.id}`, t); if (e) return e; setDel(null); await load(); }} />}
     <Spec />
     <p className="ab-retention">Masters och godkända filer sparas i 30 dagar efter leverans (första nedladdningen av boken) och raderas sedan automatiskt. Underkända producentfiler sparas inte.</p>
   </Shell>;
