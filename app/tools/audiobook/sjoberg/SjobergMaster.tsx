@@ -15,7 +15,19 @@ type Track = Overview & { url: string };
 type Mode = "preview" | "master";
 type Check = { id: string; label: string; value: number | string | null; unit?: string; requirement: string; pass: boolean };
 type Measure = { pass: boolean; checks: Check[] };
-type Done = { mode: Mode; start: number; before: Track; after: Track; master: Measure; original: Measure | null; blob: Blob };
+type Done = { mode: Mode; start: number; before: Track; after: Track; master: Measure; original: Measure | null; blob: Blob; upload: string; job: string; duration: number };
+type BookRef = { id: string; title: string; narrator: string };
+type Saved = { book: string; title: string; number: number; name: string };
+const PORTAL = "/api/sjoberg-portal";
+// Samma tolkning av kapitelnummer som portalen (servern gör samma sak om fältet lämnas tomt).
+function guessChapter(filename: string) {
+  const stem = filename.replace(/\.[^.]+$/, "").trim();
+  const kap = stem.match(/(?:kap(?:itel)?|chapter|ch)[\s._#-]*(\d{1,4})/i), nums = [...stem.matchAll(/\d{1,4}/g)];
+  const hit = kap ? { n: Number(kap[1]), at: kap.index!, len: kap[0].length } : nums.length ? { n: Number(nums[nums.length - 1][0]), at: nums[nums.length - 1].index!, len: nums[nums.length - 1][0].length } : null;
+  let name = hit ? stem.slice(0, hit.at) + " " + stem.slice(hit.at + hit.len) : stem;
+  name = name.replace(/[_#]+/g, " ").replace(/\s*[-–.]\s*$/g, "").replace(/^\s*[-–.]\s*/g, "").replace(/\s+/g, " ").trim();
+  return { number: hit ? String(hit.n) : "", name: name || (hit ? `Kapitel ${hit.n}` : "") };
+}
 const fmt = (s: number) => { const n = Math.max(0, Math.floor(Number.isFinite(s) ? s : 0)); return `${Math.floor(n / 3600)}:${String(Math.floor(n / 60) % 60).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`; };
 const sv = (t: string) => t.replace(/(\d)\.(\d)/g, "$1,$2").replace(/-(?=\d)/g, "−");
 const val = (c?: Check) => !c ? "—" : typeof c.value === "number" ? `${sv(c.value.toFixed(1))} ${c.unit ?? ""}`.trim() : sv(String(c.value ?? "—"));
@@ -89,7 +101,14 @@ export default function SjobergMaster() {
   const [start, setStart] = useState(0), [length, setLength] = useState(300), [whole, setWhole] = useState(true), [matched, setMatched] = useState(true);
   const [slot, setSlot] = useState<Slot>("before"), [playing, setPlaying] = useState(false), [current, setCurrent] = useState(0);
   const a = useRef<HTMLAudioElement>(null), b = useRef<HTMLAudioElement>(null), input = useRef<HTMLInputElement>(null), ctx = useRef<AudioContext | null>(null), gains = useRef<GainNode[]>([]), active = useRef<Slot>("before"), urls = useRef<string[]>([]), pendingSeek = useRef<number | null>(null);
-  const busy = ["loading", "uploading", "running"].includes(phase);
+  const [books, setBooks] = useState<BookRef[]>([]), [bookSel, setBookSel] = useState(""), [newTitle, setNewTitle] = useState(""), [newNarrator, setNewNarrator] = useState("");
+  const [chNum, setChNum] = useState(""), [chName, setChName] = useState(""), [taken, setTaken] = useState<number[]>([]), [saved, setSaved] = useState<Saved | null>(null), [saving, setSaving] = useState(false);
+  async function loadBooks() { const r = await fetch(`${PORTAL}/books`).catch(() => null); const d = r?.ok ? await r.json().catch(() => null) : null; if (d?.books) setBooks(d.books); }
+  useEffect(() => { void loadBooks(); }, []);
+  useEffect(() => { setTaken([]); if (!bookSel || bookSel === "new") return; void fetch(`${PORTAL}/books/${bookSel}`).then(r => r.ok ? r.json() : null).then(d => setTaken((d?.chapters || []).map((c: { number: number }) => c.number))).catch(() => {}); }, [bookSel, saved]);
+  const metaOk = (bookSel === "new" ? !!newTitle.trim() : !!bookSel) && (chNum === "" || (/^\d{1,4}$/.test(chNum.trim()))) && !!chName.trim();
+  const dupe = chNum !== "" && taken.includes(Number(chNum));
+  const busy = ["loading", "uploading", "running"].includes(phase) || saving;
   const before = whole ? source : done?.before, after = whole ? null : done?.after;
   const synced = !!before && !!after && Math.abs(before.duration - after.duration) < .2;
   const offset = done?.mode === "preview" ? done.start : 0;
@@ -117,7 +136,7 @@ export default function SjobergMaster() {
   function listenComparison() { stop(); mix("before"); pendingSeek.current = 0; setWhole(false); setCurrent(0); }
 
   async function choose(next: File) {
-    if (busy) return; stop(true); setError(""); setDone(null); setSource(null); setFile(null); setName(next.name); setStart(0); setWhole(true); mix("before");
+    if (busy) return; stop(true); setError(""); setDone(null); setSource(null); setFile(null); setName(next.name); setSaved(null); { const g = guessChapter(next.name); setChNum(g.number); setChName(g.name); } setStart(0); setWhole(true); mix("before");
     urls.current.forEach(URL.revokeObjectURL); urls.current = [];
     if (!/\.(wav|mp3|m4a|aif|aiff|flac)$/i.test(next.name) || next.size > MAX) { setPhase("idle"); setError("Välj WAV, MP3, M4A, AIFF eller FLAC, högst 1 000 MB. Dela längre böcker i kapitel."); return; }
     if (!/\.wav$/i.test(next.name) && next.size > 200 * 1024 * 1024) { setPhase("idle"); setError("MP3, M4A, AIFF och FLAC kan vara högst 200 MB. Använd WAV för större filer."); return; }
@@ -126,7 +145,23 @@ export default function SjobergMaster() {
     catch { setPhase("idle"); setError("Filen kunde inte läsas."); }
   }
 
-  async function run(mode: Mode) {
+  async function archive(d: Done) {
+    if (!metaOk) { setError("Välj bok och ange kapitlets namn först."); return; }
+    setSaving(true); setError(""); setMessage("Sparar i arkivet…");
+    try {
+      let book = bookSel, title = books.find(x => x.id === bookSel)?.title || "";
+      if (book === "new") {
+        const r = await fetch(`${PORTAL}/books`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: newTitle.trim(), narrator: newNarrator.trim() }) });
+        const x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || "Boken kunde inte skapas.");
+        book = x.id; title = newTitle.trim(); setBookSel(book); setNewTitle(""); setNewNarrator(""); await loadBooks();
+      }
+      const r = await fetch(`${PORTAL}/books/${book}/archive`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ upload: d.upload, job: d.job, filename: name, number: chNum.trim(), name: chName.trim(), duration: d.duration }) });
+      const x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || "Kapitlet kunde inte sparas i arkivet.");
+      setSaved({ book, title, number: x.number, name: x.name });
+    } catch (e) { setError(e instanceof Error && e.message ? e.message : "Kapitlet kunde inte sparas i arkivet."); }
+    finally { setSaving(false); setMessage(""); }
+  }
+  async function run(mode: Mode, save = false) {
     if (busy || !file || !source) return;
     stop(); mix("before"); setError(""); setPhase("uploading");
     try {
@@ -149,9 +184,11 @@ export default function SjobergMaster() {
       const out = await (await fetch(`${API}/${ing.id}/audio/master`)).blob();
       const beforeTrack = mode === "preview" ? await overviewOf(up) : source, afterTrack = await overviewOf(out);
       urls.current.push(afterTrack.url); if (mode === "preview") urls.current.push(beforeTrack.url);
-      setDone({ mode, start: at, before: beforeTrack, after: afterTrack, master: master!, original, blob: out });
+      const result: Done = { mode, start: at, before: beforeTrack, after: afterTrack, master: master!, original, blob: out, upload: ing.id, job, duration: ing.duration };
+      setDone(result); if (mode === "master") setSaved(null);
       setStem(file.name.replace(/\.[^.]+$/, "") + (mode === "preview" ? "_provmaster" : "_master"));
       setPhase("done"); setMessage(""); setWhole(false); setCurrent(0); pendingSeek.current = 0;
+      if (save) await archive(result);
     } catch (e) { setPhase("ready"); setError(e instanceof Error && e.message ? e.message : "Körningen kunde inte slutföras. Försök igen."); }
   }
   useEffect(() => { if (!playing) return; let f: number; const tick = () => { const lead = active.current === "before" ? a.current : b.current; if (lead) setCurrent(lead.currentTime); if (synced && a.current && b.current && !a.current.seeking && !b.current.seeking && Math.abs(a.current.currentTime - b.current.currentTime) > .04) b.current.currentTime = a.current.currentTime; f = requestAnimationFrame(tick); }; f = requestAnimationFrame(tick); return () => cancelAnimationFrame(f); }, [playing, synced]);
@@ -167,8 +204,8 @@ export default function SjobergMaster() {
   return <main className="ab-studio" lang="sv">
     <header className="ab-header"><Wordmark href="/tools/audiobook/sjoberg/portal" /><span className="ab-badge">SJÖBERG FÖRLAG · AUDIOBOOK</span></header>
     <SjNav active="prov" />
-    <div className="ab-heading"><div><p className="ab-eyebrow"><a href="/tools/audiobook/sjoberg/portal">← Till portalen</a> · PROVLYSSNA · JÄMFÖR · MASTRA</p><h1>Audiobook<span>.</span></h1></div><p>Lyssna på originalet, provmastra ett utdrag och jämför före och efter. När du är nöjd mastrar du hela kapitlet.</p></div>
-    <ol className="ab-steps" aria-label="Så fungerar det"><li><span>1</span><div><strong>Ladda upp och lyssna</strong><p>Välj din fil och lyssna på originalet.</p></div></li><li><span>2</span><div><strong>Provmastra ett utdrag</strong><p>Välj ett avsnitt och hör resultatet.</p></div></li><li><span>3</span><div><strong>Mastra hela kapitlet</strong><p>Jämför och ladda ner den färdiga mastern.</p></div></li></ol>
+    <div className="ab-heading"><div><p className="ab-eyebrow">PROVLYSSNA · JÄMFÖR · MASTRA</p><h1>Audiobook<span>.</span></h1></div><p>Lyssna på originalet, provmastra ett utdrag och jämför före och efter. När du är nöjd mastrar du hela kapitlet och sparar det i bokens arkiv.</p></div>
+    <ol className="ab-steps" aria-label="Så fungerar det"><li><span>1</span><div><strong>Ladda upp och lyssna</strong><p>Välj din fil och lyssna på originalet.</p></div></li><li><span>2</span><div><strong>Provmastra ett utdrag</strong><p>Välj ett avsnitt och hör resultatet.</p></div></li><li><span>3</span><div><strong>Mastra hela kapitlet</strong><p>Spara i arkivet och ladda ner den färdiga mastern.</p></div></li></ol>
     <section className="ab-workspace" aria-label="Ljudbok och provfönster"><div className="ab-filebar"><div><span className="ab-eyebrow">01 · LADDA UPP OCH LYSSNA</span><h2>{name || "Välj din ljudfil"}</h2></div><button className="ab-secondary" disabled={busy} onClick={() => input.current?.click()}>{name ? "Byt fil" : "Välj ljudfil"}</button></div>
       <input ref={input} hidden type="file" accept=".wav,.mp3,.m4a,.aif,.aiff,.flac" onChange={e => { if (e.target.files?.[0]) void choose(e.target.files[0]); e.target.value = ""; }} />
       {!source ? <div className="ab-drop" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) void choose(e.dataTransfer.files[0]); }}><div className="ab-drop-icon">↑</div><p>{phase === "loading" ? "Läser in vågformen…" : "Dra din ljudfil hit"}</p><span>WAV · högst 1 000 MB · mono eller stereo<br />MP3, M4A, AIFF och FLAC upp till 200 MB<br />Dela längre böcker i kapitel.</span></div> : <>
@@ -186,9 +223,19 @@ export default function SjobergMaster() {
       {synced && <label className="ab-match"><input type="checkbox" checked={matched} onChange={e => { setMatched(e.target.checked); mix(slot, e.target.checked); }} />Nivåmatcha lyssningen. Ungefärlig jämförelsenivå; påverkar inte mastern.</label>}
       <audio ref={a} src={before?.url} preload="metadata" onLoadedMetadata={() => { if (pendingSeek.current !== null && a.current) { a.current.currentTime = Math.min(pendingSeek.current, a.current.duration); pendingSeek.current = null; } }} onEnded={() => stop(true)} /><audio ref={b} src={after?.url} preload="metadata" onEnded={() => stop(true)} />
     </section>
+    {source && <section className="ab-workspace sj-meta" aria-label="Bok och kapitel"><div className="ab-filebar"><div><span className="ab-eyebrow">BOK OCH KAPITEL</span><h2>Var ska kapitlet sparas?</h2></div></div>
+      <div className="sj-meta-grid">
+        <label>Bok<select value={bookSel} disabled={busy} onChange={e => { setBookSel(e.target.value); setSaved(null); }}><option value="">Välj bok…</option>{books.map(x => <option key={x.id} value={x.id}>{x.title}{x.narrator ? ` · ${x.narrator}` : ""}</option>)}<option value="new">+ Ny bok…</option></select></label>
+        {bookSel === "new" && <><label>Bokens titel<input maxLength={200} value={newTitle} disabled={busy} onChange={e => setNewTitle(e.target.value)} placeholder="Titel" /></label><label>Inläsare<input maxLength={200} value={newNarrator} disabled={busy} onChange={e => setNewNarrator(e.target.value)} placeholder="Namn" /></label></>}
+        <label>Kapitelnummer<input inputMode="numeric" maxLength={4} value={chNum} disabled={busy} onChange={e => setChNum(e.target.value.replace(/\D/g, ""))} placeholder="Nästa lediga" /></label>
+        <label>Kapitelnamn<input maxLength={200} value={chName} disabled={busy} onChange={e => setChName(e.target.value)} placeholder="Till exempel Kapitel 3" /></label>
+      </div>
+      {dupe && <p className="ab-info">Kapitel {chNum} finns redan i boken. Båda sparas, och du kan ändra numret i portalen.</p>}
+      <p className="sj-small">Du kan provmastra utan att välja bok. Bok och kapitel behövs först när du sparar i arkivet.</p>
+    </section>}
     <section className="ab-master-panel sj-spec"><div><p className="ab-eyebrow">02 · LEVERANSSPEC</p><h2>Audiobook Nordic</h2><p>Alla filer mastras automatiskt mot samma fasta spec. Det finns inget att ställa in.</p></div>
       <dl className="sj-specgrid"><div><dt>Ljudnivå</dt><dd>−17,5 LUFS ±0,5</dd></div><div><dt>True peak</dt><dd>≤ −3,0 dBTP</dd></div><div><dt>Brusgolv</dt><dd>≤ −80 dBFS</dd></div><div><dt>Format</dt><dd>44,1 kHz / 16 bit mono</dd></div></dl></section>
-    <section className="ab-actions" aria-label="Bearbetning"><button className="ab-master" disabled={!file || busy} onClick={() => void run("preview")}>Provmastra utdraget <span>↗</span></button><button className="ab-secondary" disabled={!file || busy} onClick={() => void run("master")}>Mastra hela kapitlet</button><p>Provmastra ett utdrag på 5 eller 10 minuter och lyssna innan du mastrar hela kapitlet. Slutmastern kan skilja sig något från utdraget eftersom hela filens nivå bedöms.</p></section>
+    <section className="ab-actions" aria-label="Bearbetning"><button className="ab-master" disabled={!file || busy} onClick={() => void run("preview")}>Provmastra utdraget <span>↗</span></button><button className="ab-master" disabled={!file || busy || !metaOk} onClick={() => void run("master", true)}>Mastra hela kapitlet och spara i arkivet <span>→</span></button><button className="ab-secondary" disabled={!file || busy} onClick={() => void run("master")}>Mastra utan att spara</button><p>Provmastra ett utdrag på 5 eller 10 minuter och lyssna innan du mastrar hela kapitlet. Slutmastern kan skilja sig något från utdraget eftersom hela filens nivå bedöms.</p></section>
     <div role="status" aria-live="polite" className="ab-status">{busy && <><span className="ab-spinner" />{message}</>}</div>
     {error && <p role="alert" className="ab-error">{error}</p>}
     {stale && <p className="ab-info">Utdraget har flyttats. Resultatet nedan gäller fortfarande {fmt(done!.start)}–{fmt(done!.start + done!.before.duration)}. Provmastra igen för ett nytt resultat.</p>}
@@ -197,9 +244,11 @@ export default function SjobergMaster() {
       <p className={failed.length ? "ab-error" : "ab-info"}>{failed.length ? `Utanför målkraven: ${failed.map(r => r.c.label).join(", ")}. Lyssna och kontakta Saltwaves innan leverans.` : "De uppmätta målkraven klaras. Gör också en lyssningskontroll före leverans."}</p>
       <div className="ab-report-table"><table><thead><tr><th>Parameter</th><th>Före</th><th>Efter</th><th>Krav</th><th>Utfall</th></tr></thead><tbody>{rows.map(({ c, o }) => <tr key={c.id}><td>{c.label}</td><td>{val(o)}</td><td>{val(c)}</td><td>{sv(c.requirement)}</td><td className={c.pass ? "" : "ab-fail"}>{c.pass ? "OK" : "Avvikelse"}</td></tr>)}</tbody></table></div>
       <label className="ab-filename">Filnamn för nedladdning<div><input aria-label="Filnamn för nedladdning" value={stem} maxLength={236} onChange={e => setStem(e.target.value)} spellCheck={false} /><span>.wav</span></div><small>Originalets namn är förifyllt. Du kan ändra det här.</small></label>
-      <div className="ab-downloads"><button className="ab-master" onClick={download}>{done.mode === "preview" ? "Ladda ner provmastrat utdrag" : "Ladda ner master"}<span>↓</span></button>{done.mode === "preview" && <button className="ab-secondary" disabled={busy} onClick={() => void run("master")}>Nöjd? Mastra hela kapitlet</button>}</div>
+      <div className="ab-downloads"><button className="ab-master" onClick={download}>{done.mode === "preview" ? "Ladda ner provmastrat utdrag" : "Ladda ner master"}<span>↓</span></button>{done.mode === "preview" && <button className="ab-secondary" disabled={busy || !metaOk} onClick={() => void run("master", true)}>Nöjd? Mastra hela kapitlet och spara i arkivet</button>}{done.mode === "master" && !saved && <button className="ab-secondary" disabled={busy || !metaOk} onClick={() => void archive(done)}>Spara i arkivet</button>}</div>
+      {done.mode === "master" && !saved && !metaOk && <p className="sj-small">Välj bok och kapitel ovan för att spara mastern i arkivet.</p>}
+      {saved && <p className="ab-info">Sparat i arkivet: kapitel {saved.number} – {saved.name} i ”{saved.title}”. Mätningen visas i boken när mastern har lagrats. <a href={`/tools/audiobook/sjoberg/portal/${saved.book}`}>Öppna boken →</a></p>}
     </section>}
-    <p className="ab-retention">Uppladdade filer tas bort från lagringen när de har lästs in. Ladda ner det du vill behålla.</p>
+    <p className="ab-retention">Uppladdade filer tas bort från lagringen när de har lästs in. Kapitel som sparas i arkivet finns kvar i 30 dagar efter leverans (första nedladdningen av boken). Provmastringar och mastrar som inte sparas finns bara här, så ladda ner det du vill behålla.</p>
     <footer className="ab-footer"><span>SALTWAVES STUDIO</span><span>En fil. En enhetlig behandling.</span></footer>
   </main>;
 }

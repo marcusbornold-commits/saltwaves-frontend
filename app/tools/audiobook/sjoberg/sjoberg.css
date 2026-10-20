@@ -11,3 +11,9 @@
 .sj-tab:hover{opacity:1}
 .sj-tab-on{background:var(--orange,#e0623c);color:#fff;opacity:1}
 .sj-nav-hint{margin:8px 0 0 6px;font-size:.85rem;opacity:.7}
+
+.sj-meta{margin-top:18px}
+.sj-meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.sj-meta-grid label{display:grid;gap:6px;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em}
+.sj-meta-grid input,.sj-meta-grid select{font:inherit;text-transform:none;letter-spacing:0;padding:10px 12px;border:1px solid rgba(0,0,0,.2);border-radius:10px;background:#fff}
+.sj-small{font-size:.85rem;opacity:.7;margin-top:10px}

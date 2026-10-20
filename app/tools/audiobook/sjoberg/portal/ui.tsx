@@ -40,5 +40,5 @@ export function ConfirmDelete({ title, what, expect, alt, onCancel, onConfirm }:
 export function SjNav({ active }: { active: "portal" | "prov" }) {
   const tabs = [["portal", "Portal", "/tools/audiobook/sjoberg/portal"], ["prov", "Mastringssida", "/tools/audiobook/sjoberg/prov"]] as const;
   return <nav className="sj-nav" aria-label="Sjöberg"><div className="sj-tabs">{tabs.map(([k, l, h]) => <a key={k} href={h} className={k === active ? "sj-tab sj-tab-on" : "sj-tab"} aria-current={k === active ? "page" : undefined}>{l}</a>)}</div>
-    {active === "prov" && <p className="sj-nav-hint">Fristående sida för att testa enskilda filer. Inget sparas i arkivet.</p>}</nav>;
+    {active === "prov" && <p className="sj-nav-hint">Provmastra enskilda filer och spara hela kapitel direkt i en bok i arkivet.</p>}</nav>;
 }

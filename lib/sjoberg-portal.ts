@@ -116,6 +116,19 @@ export async function createChapter(bookId: string, source: Chapter["source"], t
   return data as Chapter;
 }
 
+// Mastringssidan: hela kapitlet är redan inläst (och ev. mastrat) i backend. Samma väg som portalens kapitel
+// (finishMaster → samma lagringsväg, mätning och godkänt/underkänt), utan ny uppladdning av filen.
+export async function archiveMaster(bookId: string, upload: string, job: string, filename: string, number: number, name: string, duration: number | null) {
+  const r = await backend(`jobs/${job}`, undefined, 30000);
+  const d = r.ok ? await r.json() : null;
+  if (!d || d.upload !== upload || d.state === "failed") throw Object.assign(new Error("job"), { user: "Mastringen hittades inte. Mastra kapitlet igen." });
+  const { data, error } = await db().from("sjoberg_chapters").insert({ book_id: bookId, number, name: name.slice(0, 200), original_filename: filename.slice(0, 255), source: "sjoberg", link_id: null, status: "processing", backend_upload: upload, backend_job: job, duration_s: duration }).select("*").single();
+  if (error || !data) throw new Error("insert");
+  const c = data as Chapter; inflight.add(c.id);
+  void finishMaster(c).catch(async e => setCh(c.id, { status: "failed", error: (e as { user?: string }).user || "Mastern kunde inte sparas. Mastra kapitlet igen." })).finally(() => inflight.delete(c.id));
+  return c;
+}
+
 async function ingest(tusPath: string, filename: string): Promise<{ id: string; duration: number }> {
   const r = await backend("ingest", { method: "POST", body: JSON.stringify({ path: tusPath, filename: filename.slice(0, 200) }) });
   if (!r.ok) throw Object.assign(new Error("ingest"), { user: r.status === 413 ? "Filen är större än 1000 MB." : r.status === 400 ? "Filen kunde inte läsas som ljud." : "Filen kunde inte läsas in." });

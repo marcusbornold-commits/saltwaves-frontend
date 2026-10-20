@@ -1,6 +1,6 @@
 // Sjöberg-portalens API (bakom invite-skyddet i proxy.ts, scope "sjoberg"). Bara vitlistade anrop; svaren innehåller bara det portalen visar.
 import { NextRequest } from "next/server";
-import { BUCKET, RETENTION_DAYS, SJ_FOLDER, TENANT, createChapter, db, fail, hashToken, isUuid, newToken, noStore, purgeExpired, refresh, reportCsv, tusGrant, tusPathOk, zipName, type Check } from "@/lib/sjoberg-portal";
+import { BUCKET, RETENTION_DAYS, SJ_FOLDER, TENANT, archiveMaster, createChapter, parseChapter, db, fail, hashToken, isUuid, newToken, noStore, purgeExpired, refresh, reportCsv, tusGrant, tusPathOk, zipName, type Check } from "@/lib/sjoberg-portal";
 import { zipStream } from "@/lib/zip-stream";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +93,19 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         if (!tusPathOk(SJ_FOLDER, path)) return fail("Ogiltig uppladdning.");
         const c = await createChapter(b.id, "sjoberg", path, str(x.filename, 255) || "kapitel.wav", null);
         return Response.json({ id: c.id, number: c.number, name: c.name }, { headers: noStore });
+      }
+      if (p.length === 3 && p[2] === "archive" && m === "POST") {
+        const x = await body(); const up = str(x.upload, 32), job = str(x.job, 32), hex = /^[a-f0-9]{32}$/;
+        if (!hex.test(up) || !hex.test(job)) return fail("Ogiltig mastring.");
+        const filename = str(x.filename, 255) || "kapitel.wav";
+        const { data: rows } = await sb.from("sjoberg_chapters").select("number").eq("book_id", b.id).order("number", { ascending: false }).limit(1);
+        const guess = parseChapter(filename, (rows?.[0]?.number ?? 0) + 1);
+        const n = x.number === undefined || x.number === "" ? guess.number : Math.round(Number(x.number));
+        if (!(n >= 0 && n <= 9999)) return fail("Ogiltigt kapitelnummer.");
+        const name = str(x.name, 200) || guess.name;
+        const dur = Number(x.duration); 
+        try { const c = await archiveMaster(b.id, up, job, filename, n, name, Number.isFinite(dur) && dur > 0 ? dur : null); return Response.json({ id: c.id, number: c.number, name: c.name }, { headers: noStore }); }
+        catch (e) { const u = (e as { user?: string }).user; if (u) return fail(u, 409); throw e; }
       }
       if (p.length === 3 && p[2] === "links" && m === "POST") {
         const x = await body(); const days = Math.min(90, Math.max(1, Math.round(Number(x.days) || 14)));
