@@ -12,22 +12,29 @@ const PREVIEW_ASSETS = new Set(["/assets/emblem-ink.png", "/assets/emblem-paper.
 // Sjöberg-invites (scope "sjoberg") når bara Sjöberg-sidan och dess eget API (/api/audiobook-sjoberg, vitlistade och rensade anrop).
 const SJOBERG_PAGE = "/tools/audiobook/sjoberg";
 const SJOBERG_API = [/^\/api\/audiobook-sjoberg\//];
+// Egen domän för Sjöberg-testet (preview-tunneln → localhost:3092). Där finns bara Sjöberg-sidan, dess invite och API.
+const SJOBERG_HOST = "sjoberg.saltwaves.studio";
+const SJOBERG_ALLOWED = [SJOBERG_PAGE, "/api/audiobook-sjoberg", "/api/studio-invite", "/_next"];
+const notFound = () => new NextResponse("Not found", { status: 404, headers: { "cache-control": "no-store" } }); // så Cloudflare inte cachar 404:or
+const under = (path: string, list: string[]) => list.some(p => path === p || path.startsWith(p + "/"));
 
 export function proxy(req: NextRequest) {
-  if (!studioInviteFile()) return NextResponse.next();
   const path = req.nextUrl.pathname;
   const host = (req.headers.get("host") || "").split(":")[0].toLowerCase();
+  const sjHost = host === SJOBERG_HOST;
+  // Sjöberg-domänen: bara Sjöberg-sidan + API + statiska filer; fail-closed om invite-filen saknas.
+  if (sjHost && !PREVIEW_ASSETS.has(path) && !under(path, SJOBERG_ALLOWED)) return notFound();
+  if (!studioInviteFile()) return sjHost && !PREVIEW_ASSETS.has(path) && !path.startsWith("/_next") ? notFound() : NextResponse.next();
   const viaCloudflare = req.headers.has("cf-connecting-ip") || req.headers.has("cf-ray");
   // Preview-hosten exponerar bara studion.
-  if ((host === PREVIEW_HOST || viaCloudflare) && !PREVIEW_ASSETS.has(path) && !PREVIEW_ALLOWED.some(p => path === p || path.startsWith(p + "/")))
-    return new NextResponse("Not found", { status: 404, headers: { "cache-control": "no-store" } }); // så Cloudflare inte cachar 404:or
+  if (!sjHost && (host === PREVIEW_HOST || viaCloudflare) && !PREVIEW_ASSETS.has(path) && !under(path, PREVIEW_ALLOWED)) return notFound();
   const sjPage = path === SJOBERG_PAGE || path.startsWith(SJOBERG_PAGE + "/");
   const gated = sjPage || path === "/tools/audiobook/studio" || path.startsWith("/tools/audiobook/studio/") || path.startsWith("/api/audiobook-studio") || path.startsWith("/api/audiobook-sjoberg");
   if (!gated || OPEN.some(p => path === p || path.startsWith(p + "/"))) return NextResponse.next();
   // Marcus lokalt / via Tailscale (aldrig via Cloudflare).
   if (!viaCloudflare && LOCAL_HOSTS.has(host)) return NextResponse.next();
   const inv = verifyStudioInvite(req.cookies.get(STUDIO_COOKIE)?.value);
-  if (inv?.scope === "studio" && !sjPage && !path.startsWith("/api/audiobook-sjoberg")) return NextResponse.next();
+  if (inv?.scope === "studio" && !sjHost && !sjPage && !path.startsWith("/api/audiobook-sjoberg")) return NextResponse.next();
   if (inv?.scope === "sjoberg" && (sjPage || SJOBERG_API.some(r => r.test(path)))) return NextResponse.next();
   if (path.startsWith("/api/")) return NextResponse.json({ error: "invite required" }, { status: 401 });
   return new NextResponse(

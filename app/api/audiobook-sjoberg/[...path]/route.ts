@@ -57,7 +57,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
       if (!r.ok) return fail("Körningen kunde inte hittas.", 404);
       const d = await r.json();
       if (d.state === "done") return Response.json({ state: "done", result: measureOut(d.result) }, { headers: noStore });
-      if (d.state === "failed") return Response.json({ state: "failed", error: "Mastringen kunde inte slutföras. Försök igen eller kontakta Saltwaves." }, { headers: noStore });
+      if (d.state === "failed") return Response.json({ state: "failed", error: d.interrupted ? "Mastringen avbröts eftersom tjänsten startades om. Starta mastringen igen." : "Mastringen kunde inte slutföras. Försök igen eller kontakta Saltwaves." }, { headers: noStore });
       return Response.json({ state: "running" }, { headers: noStore });
     }
     if (p.length === 3 && ID.test(p[0]) && p[1] === "audio" && p[2] === "master" && req.method === "GET") {

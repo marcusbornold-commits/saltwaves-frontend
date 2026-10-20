@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Dev: tillåt studion över Tailscale (annars blockeras dev-resurser och sidan hydreras inte).
-  allowedDevOrigins: ["100.125.138.87", "*.ts.net", "studio-preview.saltwaves.studio"],
+  allowedDevOrigins: ["100.125.138.87", "*.ts.net", "studio-preview.saltwaves.studio", "sjoberg.saltwaves.studio"],
   // proxy.ts (invite-skydd) buffrar request-kroppen; standard 10 MB kapade långa uppladdningar tyst (Samson#03 blev 72 s).
   experimental: { proxyClientMaxBodySize: "1000mb" },
   async redirects() {

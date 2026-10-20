@@ -3,7 +3,7 @@
 Samma fil som ops/invite.py (STUDIO_INVITES_FILE). Token (256 bit) visas bara vid create; filen innehåller bara sha256."""
 import hashlib, json, os, secrets, sys, datetime
 FILE = os.environ.get("STUDIO_INVITES_FILE", os.path.expanduser("~/Saltwaves-Audiobook-studio/studio-data/invites.json"))
-BASE = os.environ.get("STUDIO_PUBLIC_URL", "https://studio-preview.saltwaves.studio")
+BASE = os.environ.get("SJOBERG_PUBLIC_URL", "https://sjoberg.saltwaves.studio")
 now = lambda: datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 def load():
     try: return json.load(open(FILE))
