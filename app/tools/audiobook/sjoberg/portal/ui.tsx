@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 /* eslint-disable @next/next/no-img-element */
 // Egen kopia av Wordmark: saltwaves-ui drar med sig hela uppladdningsklienten för podcastsidan i bundlen.
@@ -38,8 +38,25 @@ export function ConfirmDelete({ title, what, expect, alt, onCancel, onConfirm }:
 }
 
 // Toppnavigering mellan portalen och den fristående mastringssidan.
+// Senaste indikatorposition överlever klientnavigering (modulnivå), så pillen glider från förra fliken.
+let lastPill: { left: number; width: number } | null = null;
 export function SjNav({ active }: { active: "portal" | "prov" }) {
   const tabs = [["portal", "Portal", "/tools/audiobook/sjoberg/portal"], ["prov", "Mastringssida", "/tools/audiobook/sjoberg/prov"]] as const;
-  return <nav className="sj-nav" aria-label="Sjöberg"><div className="sj-tabs">{tabs.map(([k, l, h]) => <Link key={k} href={h} prefetch className={k === active ? "sj-tab sj-tab-on" : "sj-tab"} aria-current={k === active ? "page" : undefined}>{l}</Link>)}</div>
+  const wrap = useRef<HTMLDivElement>(null), pill = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const w = wrap.current, p = pill.current; if (!w || !p) return;
+    const place = (anim: boolean) => {
+      const t = w.querySelector<HTMLElement>(".sj-tab-on"); if (!t) return;
+      const to = { left: t.offsetLeft, width: t.offsetWidth };
+      p.style.transition = anim ? "" : "none";
+      p.style.transform = `translateX(${to.left}px)`; p.style.width = `${to.width}px`; p.style.opacity = "1";
+      lastPill = to;
+    };
+    if (lastPill) { p.style.transition = "none"; p.style.transform = `translateX(${lastPill.left}px)`; p.style.width = `${lastPill.width}px`; p.style.opacity = "1"; void p.offsetWidth; place(true); }
+    else place(false);
+    const ro = new ResizeObserver(() => place(false)); ro.observe(w);
+    return () => ro.disconnect();
+  }, [active]);
+  return <nav className="sj-nav" aria-label="Sjöberg"><div className="sj-tabs" ref={wrap}><span className="sj-pill" ref={pill} aria-hidden="true" />{tabs.map(([k, l, h]) => <Link key={k} href={h} prefetch className={k === active ? "sj-tab sj-tab-on" : "sj-tab"} aria-current={k === active ? "page" : undefined}>{l}</Link>)}</div>
     <p className={active === "prov" ? "sj-nav-hint sj-nav-hint-on" : "sj-nav-hint"} aria-hidden={active !== "prov"}>Provmastra enskilda filer och spara hela kapitel direkt i en bok i arkivet.</p></nav>;
 }
