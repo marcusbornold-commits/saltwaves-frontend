@@ -153,6 +153,7 @@ async function run(c: Chapter, tusPath: string) {
       const pass = !!checks && checks.length === 4 && checks.every(x => x.pass);
       if (!pass) await db().storage.from(BUCKET).remove([keep]); // bara godkända filer sparas
       await setCh(c.id, { status: pass ? "approved" : "rejected", checks, storage_path: pass ? keep : null, error: null });
+      if (pass) void logEvent("server", "chapter_saved", { book: c.book_id, chapter: c.id }, { pass, source: "producent" });
       if (!pass) void notifyChapter(c.id, "producer_rejected", false, checks);
     } else {
       const up = await ingest(tusPath, c.original_filename);
