@@ -40,7 +40,8 @@ const backend = (path: string, init?: RequestInit, ms = 600000) => fetch(`${api(
 export async function tusGrant(folder: string, filename: string, size: number) {
   const ext = filename.includes(".") ? filename.split(".").pop()!.toLowerCase() : "";
   if (!EXTS.has(ext)) return fail("Filtypen stöds inte. Använd WAV, MP3, M4A, AIFF eller FLAC.", 415);
-  if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_BYTES) return fail("Filen får vara högst 1000 MB.", 413);
+  if (size === 0) return fail("Filen är tom.", 400);
+  if (!Number.isSafeInteger(size) || size < 0 || size > MAX_BYTES) return fail("Filen får vara högst 1000 MB.", 413);
   const { url } = env();
   const path = `studio/${folder}/${randomUUID()}.${ext}`;
   const { data, error } = await db().storage.from(BUCKET).createSignedUploadUrl(path);
@@ -119,10 +120,19 @@ export async function createChapter(bookId: string, source: Chapter["source"], t
 
 // Mastringssidan: hela kapitlet är redan inläst (och ev. mastrat) i backend. Samma väg som portalens kapitel
 // (finishMaster → samma lagringsväg, mätning och godkänt/underkänt), utan ny uppladdning av filen.
-export async function archiveMaster(bookId: string, upload: string, job: string, filename: string, number: number, name: string, duration: number | null) {
+const archiving = new Map<string, Promise<Chapter>>(); // samtidiga anrop för samma mastring delar ett resultat
+export function archiveMaster(bookId: string, upload: string, job: string, filename: string, number: number, name: string, duration: number | null): Promise<Chapter> {
+  const k = `${bookId}:${job}`, cur = archiving.get(k); if (cur) return cur;
+  const p = archiveMasterOnce(bookId, upload, job, filename, number, name, duration).finally(() => archiving.delete(k));
+  archiving.set(k, p); return p;
+}
+async function archiveMasterOnce(bookId: string, upload: string, job: string, filename: string, number: number, name: string, duration: number | null) {
   const r = await backend(`jobs/${job}`, undefined, 30000);
   const d = r.ok ? await r.json() : null;
   if (!d || d.upload !== upload || d.state === "failed") throw Object.assign(new Error("job"), { user: "Mastringen hittades inte. Mastra kapitlet igen." });
+  // Samma mastring sparas bara en gång (dubbelklick / omförsök).
+  const { data: dup } = await db().from("sjoberg_chapters").select("*").eq("book_id", bookId).eq("backend_job", job).neq("status", "failed").limit(1).maybeSingle();
+  if (dup) return dup as Chapter;
   const { data, error } = await db().from("sjoberg_chapters").insert({ book_id: bookId, number, name: name.slice(0, 200), original_filename: filename.slice(0, 255), source: "sjoberg", link_id: null, status: "processing", backend_upload: upload, backend_job: job, duration_s: duration }).select("*").single();
   if (error || !data) throw new Error("insert");
   const c = data as Chapter; inflight.add(c.id);
@@ -217,28 +227,32 @@ export async function refresh(chapters: Chapter[]) {
 // 30 dagar efter leverans (första nedladdningen) tas filerna bort.
 export async function purgeExpired() {
   const sb = db();
+  // Kapitel som lagts till efter leveransen får egna 30 dagar (räknat från när de skapades), så de raderas inte i förtid.
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400e3).toISOString();
   const { data: books } = await sb.from("sjoberg_books").select("id").eq("tenant", TENANT).lt("expires_at", new Date().toISOString());
   for (const b of books || []) {
-    const { data: ch } = await sb.from("sjoberg_chapters").select("id, storage_path").eq("book_id", b.id).not("storage_path", "is", null);
+    const { data: ch } = await sb.from("sjoberg_chapters").select("id, storage_path").eq("book_id", b.id).not("storage_path", "is", null).neq("status", "processing").lt("created_at", cutoff);
     const paths = (ch || []).map(x => x.storage_path as string);
     if (paths.length) { await sb.storage.from(BUCKET).remove(paths); await sb.from("sjoberg_chapters").update({ storage_path: null }).in("id", (ch || []).map(x => x.id)); }
   }
 }
 
 export const safeName = (s: string) => s.normalize("NFC").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "").replace(/[\s–—-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 80) || "Bok";
-export const zipName = (title: string, n: number, name: string) => `${safeName(title)}_${String(n).padStart(2, "0")}_${safeName(name)}.wav`;
+export const zipName = (title: string, n: number, name: string, ext = "wav") => `${safeName(title)}_${String(n).padStart(2, "0")}_${safeName(name)}.${ext}`;
+export const extOf = (path: string | null) => { const e = (path || "").split(".").pop()?.toLowerCase() || ""; return /^(wav|mp3|m4a|aif|aiff|flac)$/.test(e) ? e : "wav"; };
 
-export function reportCsv(book: { title: string; narrator: string; isbn: string | null }, chapters: Array<{ number: number; name: string; source: string; status: string; checks: Check[] | null; duration_s: number | null }>) {
+export function reportCsv(book: { title: string; narrator: string; isbn: string | null }, chapters: Array<{ number: number; name: string; source: string; status: string; checks: Check[] | null; duration_s: number | null; storage_path?: string | null }>) {
   const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const qt = (v: unknown) => q(/^[=+\-@\t\r|]/.test(String(v ?? "")) ? "'" + String(v) : v); // fritext: skydd mot formler i Excel
   const st: Record<string, string> = { approved: "Godkänd", rejected: "Underkänd", processing: "Bearbetas", uploaded: "Uppladdad", failed: "Fel" };
   const num = (c: Check[] | null, id: string) => { const x = c?.find(k => k.id === id); return x ? (typeof x.value === "number" ? x.value.toFixed(1).replace(".", ",") : String(x.value ?? "")) : ""; };
   const ok = (c: Check[] | null, id: string) => { const x = c?.find(k => k.id === id); return x ? (x.pass ? "OK" : "Avvikelse") : ""; };
   const lines = [
-    [q("Mätrapport · Audiobook Nordic"), q(book.title), q(book.narrator), q(book.isbn || "")].join(";"),
+    [q("Mätrapport · Audiobook Nordic"), qt(book.title), qt(book.narrator), qt(book.isbn || "")].join(";"),
     ["Kapitel", "Namn", "Fil", "Källa", "Status", "Ljudnivå (LUFS)", "Ljudnivå", "True peak (dBTP)", "True peak", "Brusgolv (dBFS)", "Brusgolv", "Format", "Format OK", "Längd (min)"].map(q).join(";"),
-    ...chapters.map(c => [c.number, c.name, c.status === "approved" ? zipName(book.title, c.number, c.name) : "", c.source === "producer" ? "Producent" : "Sjöberg", st[c.status] || c.status,
+    ...chapters.map(c => [q(c.number), qt(c.name), qt(c.status === "approved" ? zipName(book.title, c.number, c.name, extOf(c.storage_path ?? null)) : ""), q(c.source === "producer" ? "Producent" : "Sjöberg"), q(st[c.status] || c.status), ...[
       num(c.checks, "loudness"), ok(c.checks, "loudness"), num(c.checks, "peak"), ok(c.checks, "peak"), num(c.checks, "noise"), ok(c.checks, "noise"), num(c.checks, "format"), ok(c.checks, "format"),
-      c.duration_s ? (c.duration_s / 60).toFixed(1).replace(".", ",") : ""].map(q).join(";")),
+      c.duration_s ? (c.duration_s / 60).toFixed(1).replace(".", ",") : ""].map(q)].join(";")),
     "", q("Krav: ljudnivå −17,5 LUFS ±0,5 · true peak ≤ −3,0 dBTP · brusgolv i pauser (median) ≤ −80 dBFS · 44,1 kHz / 16 bit / mono"),
   ];
   return "\ufeff" + lines.join("\r\n") + "\r\n";

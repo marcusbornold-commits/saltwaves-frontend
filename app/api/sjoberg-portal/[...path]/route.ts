@@ -1,6 +1,6 @@
 // Sjöberg-portalens API (bakom invite-skyddet i proxy.ts, scope "sjoberg"). Bara vitlistade anrop; svaren innehåller bara det portalen visar.
 import { NextRequest } from "next/server";
-import { BUCKET, RETENTION_DAYS, SJ_FOLDER, TENANT, archiveMaster, createChapter, parseChapter, db, fail, hashToken, isUuid, newToken, noStore, purgeExpired, refresh, reportCsv, tusGrant, tusPathOk, zipName, type Check } from "@/lib/sjoberg-portal";
+import { BUCKET, RETENTION_DAYS, SJ_FOLDER, TENANT, archiveMaster, extOf, createChapter, parseChapter, db, fail, hashToken, isUuid, newToken, noStore, purgeExpired, refresh, reportCsv, tusGrant, tusPathOk, zipName, type Check } from "@/lib/sjoberg-portal";
 import { zipStream } from "@/lib/zip-stream";
 import { STORAGE_WARN_BYTES, isAdmin, logEvent, storageBytes, whoFrom } from "@/lib/sjoberg-events";
 
@@ -95,7 +95,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         void logEvent(who, "delete", { book: b.id }, { what: "book", title: b.title });
         return Response.json({ ok: true }, { headers: noStore });
       }
-      if (p.length === 3 && p[2] === "tus" && m === "POST") { const x = await body(); void logEvent(who, "upload", { book: b.id }, { filename: str(x.filename, 255), size: Number(x.size) || null }); return tusGrant(SJ_FOLDER, str(x.filename, 255), Number(x.size)); }
+      if (p.length === 3 && p[2] === "tus" && m === "POST") { const x = await body(); void logEvent(who, "upload", { book: b.id }, { filename: str(x.filename, 255), size: Number(x.size) || null }); return tusGrant(SJ_FOLDER, str(x.filename, 1000), Number(x.size)); }
       if (p.length === 3 && p[2] === "chapters" && m === "POST") {
         const x = await body(); const path = str(x.path, 200);
         if (!tusPathOk(SJ_FOLDER, path)) return fail("Ogiltig uppladdning.");
@@ -134,7 +134,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         await deliver(b.id, b);
         void logEvent(who, "download_zip", { book: b.id }, { chapters: ok.length });
         const used = new Set<string>();
-        const entries = ok.map(c => { let n = zipName(b.title, c.number, c.name); for (let i = 2; used.has(n); i++) n = zipName(b.title, c.number, `${c.name}-${i}`); used.add(n); return { name: n, open: async () => { const r = await signed(c.storage_path!); return { body: r.body!, size: Number(r.headers.get("content-length")) || null }; } }; });
+        const entries = ok.map(c => { const ext = extOf(c.storage_path); let n = zipName(b.title, c.number, c.name, ext); for (let i = 2; used.has(n); i++) n = zipName(b.title, c.number, `${c.name}-${i}`, ext); used.add(n); return { name: n, open: async () => { const r = await signed(c.storage_path!); return { body: r.body!, size: Number(r.headers.get("content-length")) || null }; } }; });
         entries.push({ name: `${base}_matrapport.csv`, open: async () => csv as never });
         return new Response(zipStream(entries), { headers: { ...noStore, "content-type": "application/zip", "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(base + ".zip")}` } });
       }

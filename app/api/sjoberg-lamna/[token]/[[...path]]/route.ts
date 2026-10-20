@@ -24,7 +24,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ token: string; 
     if (req.method !== "POST" || path.length !== 1) return fail("Ogiltig förfrågan.", 404);
     if (!l.open) return fail("Länken är stängd eller har gått ut. Kontakta förlaget.", 410);
     const x = await req.json().catch(() => ({})) as Record<string, unknown>;
-    if (path[0] === "tus") return tusGrant(linkFolder(l.id), String(x.filename || "").slice(0, 255), Number(x.size));
+    if (path[0] === "tus") return tusGrant(linkFolder(l.id), String(x.filename || "").slice(0, 1000), Number(x.size));
     if (path[0] === "klar") {
       const p = String(x.path || "");
       if (!tusPathOk(linkFolder(l.id), p)) return fail("Ogiltig uppladdning.");
