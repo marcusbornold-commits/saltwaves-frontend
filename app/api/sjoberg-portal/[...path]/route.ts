@@ -123,7 +123,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         if (!ok.length) return fail("Det finns inga godkända kapitel att ladda ner ännu.", 409);
         await deliver(b.id, b);
         const used = new Set<string>();
-        const entries = ok.map(c => { let n = zipName(b.title, c.number, c.name); for (let i = 2; used.has(n); i++) n = zipName(b.title, c.number, `${c.name}-${i}`); used.add(n); return { name: n, open: async () => (await signed(c.storage_path!)).body! }; });
+        const entries = ok.map(c => { let n = zipName(b.title, c.number, c.name); for (let i = 2; used.has(n); i++) n = zipName(b.title, c.number, `${c.name}-${i}`); used.add(n); return { name: n, open: async () => { const r = await signed(c.storage_path!); return { body: r.body!, size: Number(r.headers.get("content-length")) || null }; } }; });
         entries.push({ name: `${base}_matrapport.csv`, open: async () => csv as never });
         return new Response(zipStream(entries), { headers: { ...noStore, "content-type": "application/zip", "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(base + ".zip")}` } });
       }
