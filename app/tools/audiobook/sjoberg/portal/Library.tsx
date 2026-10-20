@@ -8,6 +8,9 @@ export default function Library() {
   const [title, setTitle] = useState(""), [narrator, setNarrator] = useState(""), [isbn, setIsbn] = useState("");
   const load = () => fetch(`${API}/books`).then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); setBooks(d.books); }).catch(e => setError(e.message || "Arkivet kunde inte laddas."));
   useEffect(() => { void load(); }, []);
+  // Lagringsvarning: API:t svarar bara för admin-inviten, alla andra får 404 och ser ingenting.
+  const [storage, setStorage] = useState<{ bytes: number; limit: number; warn: boolean } | null>(null);
+  useEffect(() => { fetch(`${API}/admin/storage`).then(r => r.ok ? r.json() : null).then(d => { if (d && typeof d.bytes === "number") setStorage(d); }).catch(() => {}); }, []);
   async function create(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError("");
     const r = await fetch(`${API}/books`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, narrator, isbn }) });
@@ -24,6 +27,7 @@ export default function Library() {
         <label>ISBN (valfritt)<input maxLength={32} value={isbn} onChange={e => setIsbn(e.target.value)} placeholder="978-…" /></label>
         <button className="ab-master" disabled={busy || !title.trim()}>Skapa bok <span>→</span></button>
       </form></section>
+    {storage && <p className={storage.warn ? "ab-error" : "sp-small"} role={storage.warn ? "alert" : undefined}>{storage.warn ? "Lagringen närmar sig gränsen: " : "Lagring (bara du ser detta): "}{(storage.bytes / 1e9).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} GB av {storage.limit / 1e9} GB. <a href="/tools/audiobook/sjoberg/portal/aktivitet">Aktivitet →</a></p>}
     {error && <p role="alert" className="ab-error">{error}</p>}
     <section className="ab-next-step"><p className="ab-eyebrow">02 · ARKIV</p><h2>{books?.length ? `${books.length} ${books.length === 1 ? "bok" : "böcker"}` : "Inga böcker ännu."}</h2>
       {!books && !error && <p className="ab-status"><span className="ab-spinner" />Laddar arkivet…</p>}

@@ -4,6 +4,7 @@
 import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { logEvent, notifyChapter } from "@/lib/sjoberg-events";
 
 export const BUCKET = "audiobook-private";
 export const TENANT = "sjoberg";
@@ -152,6 +153,7 @@ async function run(c: Chapter, tusPath: string) {
       const pass = !!checks && checks.length === 4 && checks.every(x => x.pass);
       if (!pass) await db().storage.from(BUCKET).remove([keep]); // bara godkända filer sparas
       await setCh(c.id, { status: pass ? "approved" : "rejected", checks, storage_path: pass ? keep : null, error: null });
+      if (!pass) void notifyChapter(c.id, "producer_rejected", false, checks);
     } else {
       const up = await ingest(tusPath, c.original_filename);
       const r = await backend(`${up.id}/master`, { method: "POST", body: JSON.stringify({ declick: "av", klang: "neutral", mic: "condenser" }) });
@@ -179,6 +181,8 @@ async function finishMaster(c: Chapter) {
       const path = finalPath(c, "wav");
       await uploadMaster(c.backend_upload!, path);
       await setCh(c.id, { status: pass ? "approved" : "rejected", checks, storage_path: path, error: null });
+      void logEvent("server", "chapter_saved", { book: c.book_id, chapter: c.id }, { pass });
+      void notifyChapter(c.id, "done", pass, checks);
       return;
     }
     if (Date.now() - started > 4 * 3600e3) throw Object.assign(new Error("timeout"), { user: "Mastringen tog för lång tid. Ladda upp filen igen." });

@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { BUCKET, RETENTION_DAYS, SJ_FOLDER, TENANT, archiveMaster, createChapter, parseChapter, db, fail, hashToken, isUuid, newToken, noStore, purgeExpired, refresh, reportCsv, tusGrant, tusPathOk, zipName, type Check } from "@/lib/sjoberg-portal";
 import { zipStream } from "@/lib/zip-stream";
+import { STORAGE_WARN_BYTES, isAdmin, logEvent, storageBytes, whoFrom } from "@/lib/sjoberg-events";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 3600;
@@ -42,8 +43,14 @@ async function deliver(id: string, b: { delivered_at: string | null }) {
 async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const p = (await ctx.params).path, m = req.method;
   const body = async () => (m === "POST" || m === "PATCH" || m === "DELETE") ? await req.json().catch(() => ({})) as Record<string, unknown> : {};
+  const who = whoFrom(req);
   try {
     const sb = db();
+    if (p.length === 2 && p[0] === "admin" && p[1] === "storage" && m === "GET") {
+      if (!isAdmin(req)) return fail("Ogiltig förfrågan.", 404);
+      const bytes = await storageBytes();
+      return Response.json({ bytes, limit: 100e9, warn: bytes >= STORAGE_WARN_BYTES }, { headers: noStore });
+    }
     if (p.length === 1 && p[0] === "books") {
       if (m === "GET") {
         await purgeExpired().catch(() => {});
@@ -85,13 +92,15 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         const e2 = (await sb.from("sjoberg_upload_links").delete().eq("book_id", b.id)).error;
         const e3 = (await sb.from("sjoberg_books").delete().eq("id", b.id).eq("tenant", TENANT)).error;
         if (e1 || e2 || e3) throw new Error("db");
+        void logEvent(who, "delete", { book: b.id }, { what: "book", title: b.title });
         return Response.json({ ok: true }, { headers: noStore });
       }
-      if (p.length === 3 && p[2] === "tus" && m === "POST") { const x = await body(); return tusGrant(SJ_FOLDER, str(x.filename, 255), Number(x.size)); }
+      if (p.length === 3 && p[2] === "tus" && m === "POST") { const x = await body(); void logEvent(who, "upload", { book: b.id }, { filename: str(x.filename, 255), size: Number(x.size) || null }); return tusGrant(SJ_FOLDER, str(x.filename, 255), Number(x.size)); }
       if (p.length === 3 && p[2] === "chapters" && m === "POST") {
         const x = await body(); const path = str(x.path, 200);
         if (!tusPathOk(SJ_FOLDER, path)) return fail("Ogiltig uppladdning.");
         const c = await createChapter(b.id, "sjoberg", path, str(x.filename, 255) || "kapitel.wav", null);
+        void logEvent(who, "master_start", { book: b.id, chapter: c.id }, { via: "portal" });
         return Response.json({ id: c.id, number: c.number, name: c.name }, { headers: noStore });
       }
       if (p.length === 3 && p[2] === "archive" && m === "POST") {
@@ -104,7 +113,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         if (!(n >= 0 && n <= 9999)) return fail("Ogiltigt kapitelnummer.");
         const name = str(x.name, 200) || guess.name;
         const dur = Number(x.duration); 
-        try { const c = await archiveMaster(b.id, up, job, filename, n, name, Number.isFinite(dur) && dur > 0 ? dur : null); return Response.json({ id: c.id, number: c.number, name: c.name }, { headers: noStore }); }
+        try { const c = await archiveMaster(b.id, up, job, filename, n, name, Number.isFinite(dur) && dur > 0 ? dur : null); void logEvent(who, "master_start", { book: b.id, chapter: c.id }, { via: "mastringssida, sparas i arkivet" }); return Response.json({ id: c.id, number: c.number, name: c.name }, { headers: noStore }); }
         catch (e) { const u = (e as { user?: string }).user; if (u) return fail(u, 409); throw e; }
       }
       if (p.length === 3 && p[2] === "links" && m === "POST") {
@@ -118,10 +127,12 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         const ch = await chapters(b.id);
         const csv = new TextEncoder().encode(reportCsv(b, ch));
         const base = zipName(b.title, 0, "x").replace(/_00_x\.wav$/, "");
+        if (p[2] === "rapport.csv") void logEvent(who, "report", { book: b.id });
         if (p[2] === "rapport.csv") return new Response(csv, { headers: { ...noStore, "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(base + "_matrapport.csv")}` } });
         const ok = ch.filter(c => c.status === "approved" && c.storage_path);
         if (!ok.length) return fail("Det finns inga godkända kapitel att ladda ner ännu.", 409);
         await deliver(b.id, b);
+        void logEvent(who, "download_zip", { book: b.id }, { chapters: ok.length });
         const used = new Set<string>();
         const entries = ok.map(c => { let n = zipName(b.title, c.number, c.name); for (let i = 2; used.has(n); i++) n = zipName(b.title, c.number, `${c.name}-${i}`); used.add(n); return { name: n, open: async () => { const r = await signed(c.storage_path!); return { body: r.body!, size: Number(r.headers.get("content-length")) || null }; } }; });
         entries.push({ name: `${base}_matrapport.csv`, open: async () => csv as never });
@@ -145,7 +156,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
         const paths = new Set((objs || []).filter(o => o.name.startsWith(c.id + ".")).map(o => `${SJ_FOLDER}/${c.book_id}/${o.name}`));
         if (c.storage_path) paths.add(c.storage_path);
         if (paths.size) { const { error } = await sb.storage.from(BUCKET).remove([...paths]); if (error) throw new Error("storage"); }
-        await sb.from("sjoberg_chapters").delete().eq("id", c.id); return Response.json({ ok: true }, { headers: noStore });
+        await sb.from("sjoberg_chapters").delete().eq("id", c.id); void logEvent(who, "delete", { book: c.book_id, chapter: c.id }, { what: "chapter", number: c.number, name: c.name }); return Response.json({ ok: true }, { headers: noStore });
       }
       if (p.length === 3 && p[2] === "audio" && m === "GET" && c.storage_path) {
         const r = await signed(c.storage_path); const h = new Headers({ ...noStore, "content-type": "audio/wav" }); const len = r.headers.get("content-length"); if (len) h.set("content-length", len);

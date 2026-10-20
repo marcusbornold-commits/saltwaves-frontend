@@ -2,6 +2,7 @@
 // Inga kapitellistor, inga mätvärden, ingen lyssning eller nedladdning. Filerna mastras inte, de mäts mot specen.
 import { NextRequest } from "next/server";
 import { adviceLines } from "@/lib/sjoberg-advice";
+import { logEvent } from "@/lib/sjoberg-events";
 import { createChapter, isUuid, db, fail, linkByToken, linkFolder, noStore, tusGrant, tusPathOk } from "@/lib/sjoberg-portal";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ token: string; 
       const p = String(x.path || "");
       if (!tusPathOk(linkFolder(l.id), p)) return fail("Ogiltig uppladdning.");
       const c = await createChapter(l.book_id, "producer", p, String(x.filename || "kapitel.wav").slice(0, 255), l.id);
+      void logEvent(`producent${l.label ? ": " + l.label : ""}`, "producer_upload", { book: l.book_id, chapter: c.id }, { filename: c.original_filename });
       return Response.json({ ok: true, id: c.id }, { headers: noStore });
     }
   } catch { return fail("Tjänsten svarar inte just nu. Försök igen om en stund.", 503); }

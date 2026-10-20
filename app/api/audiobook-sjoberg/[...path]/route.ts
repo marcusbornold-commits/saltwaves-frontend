@@ -2,6 +2,7 @@
 // Specen heter "Audiobook Nordic" utåt; interna spec-id, kedjeparametrar och filvägar skickas aldrig till webbläsaren.
 import { NextRequest } from "next/server";
 import { POST as tusGrant } from "../../audiobook-studio/tus/route";
+import { logEvent, whoFrom } from "@/lib/sjoberg-events";
 
 export const dynamic = "force-dynamic";
 const base = () => process.env.AUDIOBOOK_STUDIO_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:8791");
@@ -40,7 +41,8 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
       const body = await req.json().catch(() => ({}));
       const r = await call("ingest", { method: "POST", body: JSON.stringify({ path: String(body.path || ""), filename: String(body.filename || "audio.wav").slice(0, 200) }) });
       if (!r.ok) return fail(r.status === 413 ? "Filen är större än 1000 MB." : "Filen kunde inte läsas in. Försök igen.", r.status === 413 ? 413 : 502);
-      const d = await r.json(); return Response.json({ id: d.id, duration: d.duration }, { headers: noStore });
+      const d = await r.json(); void logEvent(whoFrom(req), "upload", {}, { via: "mastringssida", filename: String(body.filename || "").slice(0, 200), duration: d.duration });
+      return Response.json({ id: d.id, duration: d.duration }, { headers: noStore });
     }
     if (p.length === 2 && ID.test(p[0]) && req.method === "POST" && p[1] === "measure") {
       const r = await call(`${p[0]}/measure`, { method: "POST" });
@@ -50,7 +52,8 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     if (p.length === 2 && ID.test(p[0]) && req.method === "POST" && p[1] === "master") {
       const r = await call(`${p[0]}/master`, { method: "POST", body: JSON.stringify({ declick: "av", klang: "neutral", mic: MIC }) });
       if (!r.ok) return fail("Mastringen kunde inte startas. Försök igen.");
-      const d = await r.json(); return Response.json({ job: d.job }, { headers: noStore });
+      const d = await r.json(); void logEvent(whoFrom(req), "master_start", {}, { via: "mastringssida" });
+      return Response.json({ job: d.job }, { headers: noStore });
     }
     if (p.length === 2 && p[0] === "jobs" && ID.test(p[1]) && req.method === "GET") {
       const r = await call(`jobs/${p[1]}`);
