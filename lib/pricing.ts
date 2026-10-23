@@ -48,7 +48,7 @@ export const PRICING_TIERS: PricingTier[] = [
     annualPrice: "$190",
     badge: "Most popular",
     featured: true,
-    items: ["Unlimited episodes", "Priority processing"],
+    items: ["10h/month, max 1GB per file", "Priority processing"],
     cta: "Get Creator",
   },
   {
