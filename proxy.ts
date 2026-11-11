@@ -66,7 +66,8 @@ export function proxy(req: NextRequest) {
   if (!studioInviteFile()) return sjHost && !PREVIEW_ASSETS.has(path) && !path.startsWith("/_next") ? notFound() : NextResponse.next();
   const viaCloudflare = req.headers.has("cf-connecting-ip") || req.headers.has("cf-ray");
   // Preview-hosten exponerar bara studion.
-  if (!sjHost && (host === PREVIEW_HOST || viaCloudflare) && !PREVIEW_ASSETS.has(path) && !under(path, PREVIEW_ALLOWED)) return notFound();
+  // Open Doors-domänen och dess öppna/gating-vägar ska inte fångas av studio-preview-spärren.
+  if (!sjHost && host !== OD_HOST && !odPage && !odApi && (host === PREVIEW_HOST || viaCloudflare) && !PREVIEW_ASSETS.has(path) && !under(path, PREVIEW_ALLOWED)) return notFound();
   const sjPage = path === SJOBERG_PAGE || path.startsWith(SJOBERG_PAGE + "/");
   const gated = sjPage || path === "/tools/audiobook/studio" || path.startsWith("/tools/audiobook/studio/") || path.startsWith("/api/audiobook-studio") || path.startsWith("/api/audiobook-sjoberg") || path.startsWith("/api/sjoberg-portal") || path.startsWith("/api/sjoberg-lamna");
   if (!gated || OPEN.some(p => path === p || path.startsWith(p + "/"))) return NextResponse.next();
