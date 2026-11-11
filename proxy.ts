@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { STUDIO_COOKIE, studioInviteFile, verifyStudioInvite } from "@/lib/studio-invite";
+import { OPENDOORS_COOKIE, opendoorsInviteFile, verifyOpendoorsInvite } from "@/lib/opendoors-invite";
 
 const PREVIEW_HOST = "studio-preview.saltwaves.studio";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "100.125.138.87"]);
@@ -17,6 +18,9 @@ const SJOBERG_PAGE = "/tools/audiobook/sjoberg";
 const SJOBERG_API = [/^\/api\/audiobook-sjoberg\//, /^\/api\/sjoberg-portal\//];
 // Egen domän för Sjöberg-testet (preview-tunneln → localhost:3092). Där finns bara Sjöberg-sidan, dess invite och API.
 const SJOBERG_HOST = "sjoberg.saltwaves.studio";
+const OD_HOST = "opendoors.saltwaves.studio";
+const OD_PAGE = "/tools/opendoors";
+const OD_OPEN = ["/tools/opendoors/invite", "/api/opendoors-invite", "/api/opendoors-health"];
 const SJOBERG_ALLOWED = [SJOBERG_PAGE, "/api/audiobook-sjoberg", "/api/sjoberg-portal", "/api/sjoberg-lamna", "/api/sjoberg-health", "/api/studio-invite", "/_next"];
 const notFound = () => new NextResponse("Not found", { status: 404, headers: { "cache-control": "no-store" } }); // så Cloudflare inte cachar 404:or
 const under = (path: string, list: string[]) => list.some(p => path === p || path.startsWith(p + "/"));
@@ -36,6 +40,26 @@ export function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const host = (req.headers.get("host") || "").split(":")[0].toLowerCase();
   const sjHost = host === SJOBERG_HOST;
+  const odPage = path === OD_PAGE || path.startsWith(OD_PAGE + "/");
+  const odApi = path === "/api/opendoors" || path.startsWith("/api/opendoors/") || path === "/api/opendoors-invite" || path === "/api/opendoors-health";
+  const odOpen = OD_OPEN.some(p => path === p || path.startsWith(p + "/"));
+  // Open Doors-test: gate when the dedicated invite file is set. Localhost without Cloudflare is open for Marcus.
+  if (odPage || (odApi && path !== "/api/opendoors-health")) {
+    if (opendoorsInviteFile() && !odOpen) {
+      const viaCf = req.headers.has("cf-connecting-ip") || req.headers.has("cf-ray");
+      const local = !viaCf && LOCAL_HOSTS.has(host);
+      const inv = verifyOpendoorsInvite(req.cookies.get(OPENDOORS_COOKIE)?.value);
+      if (!local && !inv) {
+        if (path.startsWith("/api/")) return NextResponse.json({ error: "invite required" }, { status: 401 });
+        return new NextResponse(
+          '<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Saltwaves</title><main style="font-family:system-ui;max-width:600px;margin:15vh auto;padding:32px"><h1>Saltwaves</h1><p>Du behöver en inbjudningslänk från Saltwaves för Open Doors.</p></main>',
+          { status: 401, headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+    }
+    if (host === OD_HOST && !odPage && !odApi && !path.startsWith("/_next") && !PREVIEW_ASSETS.has(path)) {
+      return notFound();
+    }
+  }
   if (path.startsWith("/_next/static/")) return sjHost && path.startsWith("/_next/static/chunks/") && !chunkAllowed(path.slice("/_next/static/chunks/".length)) ? notFound() : NextResponse.next();
   // Sjöberg-domänen: bara Sjöberg-sidan + API + statiska filer; fail-closed om invite-filen saknas.
   if (sjHost && !PREVIEW_ASSETS.has(path) && !under(path, SJOBERG_ALLOWED)) return notFound();
