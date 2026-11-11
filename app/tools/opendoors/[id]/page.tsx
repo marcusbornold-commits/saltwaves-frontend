@@ -67,7 +67,7 @@ export default function EpisodePage() {
         {ep.status === 'done' && (
           <>
             <div className="od-dl">
-              {ep.files?.master_wav && <a className="od-btn od-btn-orange" href={ep.files.master_wav}>Ladda ner WAV (48 kHz / 24 bit)</a>}
+              {ep.files?.master_wav && <a className="od-btn od-btn-orange" href={ep.files.master_wav}>Ladda ner WAV (24-bit)</a>}
               {ep.files?.master_mp3 && <a className="od-btn" href={ep.files.master_mp3}>Ladda ner MP3 320 kbps</a>}
             </div>
             {ep.expires_at && <p className="od-muted">Filerna finns kvar till {new Date(ep.expires_at).toLocaleDateString('sv-SE')} (30 dagar efter leverans).</p>}
