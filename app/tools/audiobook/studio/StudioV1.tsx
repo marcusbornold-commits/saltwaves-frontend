@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Wordmark } from "../../../components/saltwaves-ui";
-import { buildChain, loadLimiter, predict, dbToLin, linToDb, type Chain, type Params, type Spec } from "@/lib/studio-chain";
+import { buildChain, loadLimiter, predict, dbToLin, linToDb, clampEq, eqNeutral, eqParams, type Chain, type Eq, type Params, type Spec } from "@/lib/studio-chain";
+import { EqGraph } from "./EqGraph";
 import { studioTusUpload } from "@/lib/studio-upload";
 import "../audiobook.css";
 import "./studio.css";
@@ -10,13 +11,12 @@ const API = "/api/audiobook-studio";
 type Check = { id: string; label: string; value: number | string | null; unit: string; requirement: string; pass: boolean; required?: boolean };
 type Measure = { lufs: number | null; true_peak: number | null; lra: number | null; rms: number; sample_peak: number; noise_floor: number; checks: Check[]; pass: boolean; applied_gain_db?: number; noise_expander?: Record<string, number> | null; source?: "original" | "delivery" };
 type Versions = Record<string, { lufs: number | null; meta?: { prenorm_gain_db: number; input_lufs: number } }>;
-type Declick = "av" | "lag" | "hog"; type Klang = "varm" | "neutral" | "ljus";
+type Declick = "av" | "lag" | "hog";
 type Mic = "dynamic" | "condenser";
 const MICS: [Mic, string][] = [["dynamic", "Dynamisk"], ["condenser", "Kondensator"]];
-type Preset = { name: string; label?: string; declick: Declick; klang: Klang; mic?: Mic | null; saved: number };
-// Måste matcha KLANG i backend/studio_engine.py (saltwaves-audiobook).
-const KLANG: Record<Klang, { low: number; high: number }> = { varm: { low: 1.5, high: -1.5 }, neutral: { low: 0, high: 0 }, ljus: { low: -1, high: 2 } };
-const lockedParams = (k: Klang): Params => ({ hpf: 0, low: { f: 200, g: KLANG[k].low }, mid: { f: 1000, g: 0, q: 1 }, high: { f: 6000, g: KLANG[k].high }, comp: { on: false, threshold: -24, ratio: 2.5, attack: 10, release: 150, knee: 4 }, deess: { on: false, freq: 6000, threshold: -32, ratio: 4 }, limiter: { ceiling: -3.5 }, declick: false, dfn: true });
+// Presets har en EQ (4 band, ±3 dB). Gamla klang-presets mappas av servern till motsvarande EQ-kurva.
+type Preset = { name: string; label?: string; declick: Declick; eq?: Eq; mic?: Mic | null; saved: number; from_klang?: string };
+const eqText = (e?: Eq) => { const c = clampEq(e); return (Object.keys(c) as (keyof Eq)[]).map(k => `${c[k].g > 0 ? "+" : ""}${c[k].g}`).join(" "); };
 const VERSION_KEYS = ["locked_av", "locked_lag", "locked_hog"] as const;
 const f1 = (v: number | null | undefined, d = 1) => (v === null || v === undefined || !Number.isFinite(v) ? "—" : v.toFixed(d).replace("-", "−"));
 
@@ -125,7 +125,7 @@ export default function StudioV1() {
   const [live, setLive] = useState({ lufs: -Infinity, peak: -Infinity });
   const [monitorDb, setMonitorDb] = useState(0);
   const [presets, setPresets] = useState<Preset[]>([]); const [presetName, setPresetName] = useState(""); const [presetLabel, setPresetLabel] = useState("");
-  const [mic, setMic] = useState<Mic | null>(null); const [declick, setDeclick] = useState<Declick>("av"); const [klang, setKlang] = useState<Klang>("neutral");
+  const [mic, setMic] = useState<Mic | null>(null); const [declick, setDeclick] = useState<Declick>("av"); const [eq, setEq] = useState<Eq>(eqNeutral);
   // Internt läge (fria reglage) bara för Saltwaves: ?internal=1 eller NEXT_PUBLIC_STUDIO_INTERNAL=true. Avstängt som standard.
   const [internal] = useState(() => process.env.NEXT_PUBLIC_STUDIO_INTERNAL === "true" || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("internal") === "1"));
   const [masterState, setMasterState] = useState<{ progress?: string; state?: string; result?: Measure; audio?: string; error?: string } | null>(null);
@@ -191,12 +191,13 @@ export default function StudioV1() {
   };
 
   const current = `locked_${declick}`;
-  const chainParams = internal ? params : lockedParams(klang);
+  const lockedParams = useMemo(() => eqParams(eq), [eq]);
+  const chainParams = internal ? params : lockedParams;
 
   // Förutsäg mastern (offline, samma kedja) när inställningar ändras.
   useEffect(() => {
     if (!chainParams || !spec || !buffers[current]) return;
-    let cancel = false; const t = setTimeout(async () => { const p = await predict(buffers[current], chainParams, spec); if (!cancel) setPrediction(p); }, 350);
+    let cancel = false; const t = setTimeout(async () => { const p = await predict(buffers[current], chainParams, spec); if (!cancel) { setPrediction(p); (window as unknown as { __studioPrediction?: unknown }).__studioPrediction = { ...p, params: chainParams, at: Date.now() }; } }, 350);
     return () => { cancel = true; clearTimeout(t); };
   }, [chainParams, spec, buffers, current]);
 
@@ -234,7 +235,6 @@ export default function StudioV1() {
     setPlaying(true); setListen(l => l);
     setParams(p => p ? { ...p } : p);
   };
-  useEffect(() => { if (live$.current && playing) live$.current.chain.update(lockedParams(klang), prediction?.autoGainDb ?? 0); }, [klang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mätare
   useEffect(() => {
@@ -252,13 +252,13 @@ export default function StudioV1() {
 
   const set = (fn: (p: Params) => Params) => setParams(p => p ? fn(structuredClone(p)) : p);
 
-  const savePreset = async () => { if (!params || !presetName.trim() || !mic) return; try { await api("presets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: presetName.trim(), label: presetLabel.trim(), declick, klang, mic }) }); setPresets((await api<{ presets: Preset[] }>("presets")).presets); } catch (e) { setError((e as Error).message); } };
+  const savePreset = async () => { if (!params || !presetName.trim() || !mic) return; try { await api("presets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: presetName.trim(), label: presetLabel.trim(), declick, eq, mic }) }); setPresets((await api<{ presets: Preset[] }>("presets")).presets); } catch (e) { setError((e as Error).message); } };
 
   const masterFile = async (target: { id: string } | null, f?: File) => {
     if (!params) return; if (!mic) { setMasterState({ state: "failed", error: "Välj mikrofontyp först." }); return; } setError(""); setMasterState({ progress: "Laddar upp hela filen…", state: "running" });
     try {
       const id = f ? (await uploadFile(f, pct => setMasterState({ progress: `Laddar upp hela filen… ${pct} %`, state: "running" }))).id : target!.id;
-      const { job } = await api<{ job: string }>(`${id}/master`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ declick, klang, mic, ...(internal ? { internal_params: params } : {}) }) });
+      const { job } = await api<{ job: string }>(`${id}/master`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ declick, eq, mic, ...(internal ? { internal_params: params } : {}) }) });
       for (;;) { await new Promise(r => setTimeout(r, 1500)); const s = await api<{ state: string; progress: string; result?: Measure; audio?: string; error?: string }>(`jobs/${job}`); setMasterState(s); if (s.state !== "running") break; }
     } catch (e) { setMasterState({ state: "failed", error: (e as Error).message }); }
   };
@@ -270,7 +270,7 @@ export default function StudioV1() {
 
   return <main className="ab-studio st">
     <header className="ab-header"><Wordmark href="/tools/audiobook" /><span className="ab-badge">SALTWAVES STUDIO · V1</span></header>
-    <div className="ab-heading"><div><p className="ab-eyebrow">MÄT · LEVERANSFIX · HELA KEDJAN</p><h1>Hör ändringen<span>.</span></h1></div><p>Ladda upp filen, välj ett utsnitt på 1–5 minuter och kör Full chain. Lyssna, välj klang och spara ett preset. Mastra sedan hela filen med samma inställningar. <a href="/tools/audiobook">← Tillbaka till Audiobook</a></p></div>
+    <div className="ab-heading"><div><p className="ab-eyebrow">MÄT · LEVERANSFIX · HELA KEDJAN</p><h1>Hör ändringen<span>.</span></h1></div><p>Ladda upp filen, välj ett utsnitt på 1–5 minuter och kör Full chain. Lyssna, justera EQ:n och spara ett preset. Mastra sedan hela filen med samma inställningar. <a href="/tools/audiobook">← Tillbaka till Audiobook</a></p></div>
     <div className="st-specbar" aria-label="Leveransspec"><b>Storytel</b><small>{spec?.note ?? "−17,5 LUFS ±0,5 · ≤ −3,0 dBTP · brus i pauser ≤ −80 dBFS (median) · 44,1 kHz/16 bit mono"}{spec?.source && <> · <a href={spec.source} target="_blank" rel="noreferrer">Storytels krav</a></>}</small></div>
 
     <section className="ab-workspace">
@@ -291,19 +291,19 @@ export default function StudioV1() {
     </section>
 
     {versions && params && spec && <section className="st-adjust">
-      <div className="st-adjust-head"><div><p className="ab-eyebrow">02 · LYSSNA OCH VÄLJ</p><h2>Din master</h2><p>Brusreducering, EQ, kompression, de-esser, limiter och nivå sätts automatiskt utifrån materialet. Pausexpander och nivå till Storytel (−17,5 LUFS) ingår alltid. Du väljer klickborttagning och klang.</p></div>
+      <div className="st-adjust-head"><div><p className="ab-eyebrow">02 · LYSSNA OCH VÄLJ</p><h2>Din master</h2><p>Brusreducering, EQ, kompression, de-esser, limiter och nivå sätts automatiskt utifrån materialet. Pausexpander och nivå till Storytel (−17,5 LUFS) ingår alltid. Du väljer klickborttagning och finjusterar klangen med EQ:n (±3 dB per band).</p></div>
         <div className="st-transport"><button className="ab-play" aria-label={playing ? "Pausa" : "Spela"} onClick={() => playing ? stopLive() : void playLive()}>{playing ? "Ⅱ" : "▶"}</button><div className="ab-switch" role="group" aria-label="A/B"><button aria-pressed={listen === "original"} onClick={() => setListen("original")}>A · Original</button><button aria-pressed={listen === "processed"} onClick={() => setListen("processed")}>B · Bearbetat</button></div><small>Nivåmatchat</small></div></div>
       {exc && <div className="st-excerpt"><p className="st-note">Utsnitt {mmss(exc.start)}–{mmss(exc.start + exc.buffer.duration)}. Klicka var som helst för att spela A/B därifrån.</p><Waveform buffer={exc.buffer} position={pos} onSeek={t => { stopOrig(); setPos(t); void playLive(t); }} /></div>}
       <div className="st-choices">
         <div role="group" aria-label="Klickborttagning"><span>Klickborttagning</span>{([["av", "Av"], ["lag", "Låg"], ["hog", "Hög"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={declick === k} onClick={() => setDeclick(k)}>{l}</button>)}</div>
-        {!internal && <div role="group" aria-label="Klang"><span>Klang</span>{([["varm", "Varm"], ["neutral", "Neutral"], ["ljus", "Ljus"]] as const).map(([k, l]) => <button key={k} className="ab-secondary" aria-pressed={klang === k} onClick={() => setKlang(k)}>{l}</button>)}</div>}
       </div>
+      {!internal && <EqGraph eq={eq} onChange={setEq} />}
       <div className="st-meters st-meters-3">
         <div className={levelOk ? "st-ok" : "st-bad"}><span>Förväntad master, integrerad</span><b>{prediction ? f1(prediction.level) : "…"} LUFS</b><small>Krav {f1(spec.target - (spec.tolerance ?? 0.5))} till {f1(spec.target + (spec.tolerance ?? 0.5))}</small></div>
         <div className={tpOk ? "st-ok" : "st-bad"}><span>Förväntad true peak</span><b>{prediction ? f1(prediction.truePeak) : "…"} dBTP</b><small>Krav ≤ {f1(spec.peak_max)}</small></div>
         <div className={noiseOk ? "st-ok" : "st-bad"}><span>Förväntat brus i pauser (median)</span><b>{prediction ? f1(prediction.noise) : "…"} dBFS</b><small>Krav ≤ {f1(spec.noise_max, 0)} · före dither</small></div>
       </div>
-      {internal && <div className="st-grid"><p className="st-note">Internt läge: fria reglage ovanpå den automatiska kedjan (ersätter klang).</p>
+      {internal && <div className="st-grid"><p className="st-note">Internt läge: fria reglage ovanpå den automatiska kedjan (ersätter EQ:n).</p>
         <div className="st-box"><h3>EQ</h3><EqCurve p={params} />
           <Slider label="Högpass" value={params.hpf} min={0} max={200} step={5} unit="Hz" onChange={v => set(p => ({ ...p, hpf: v }))} />
           <Slider label="Bas, nivå" value={params.low.g} min={-12} max={12} step={0.5} unit="dB" onChange={v => set(p => { p.low.g = v; return p; })} />
@@ -320,7 +320,7 @@ export default function StudioV1() {
           <Slider label="Lyssningsvolym" value={monitorDb} min={-20} max={6} step={0.5} unit="dB" onChange={setMonitorDb} /></div></div>}
       <div className="st-panel"><h3>Presets</h3>
         <div className="st-preset"><input placeholder="Namn" value={presetName} onChange={e => setPresetName(e.target.value)} /><input placeholder="Inläsare eller bok (valfritt)" value={presetLabel} onChange={e => setPresetLabel(e.target.value)} /><button className="ab-secondary" disabled={!presetName.trim() || !mic} onClick={() => void savePreset()}>Spara</button></div>
-        <ul className="st-presets">{presets.map(p => <li key={p.name}><button className="ab-secondary" title={`${p.label || ""} ${p.declick}/${p.klang}/${p.mic ?? "mic saknas"}`} onClick={() => { setDeclick(p.declick); setKlang(p.klang); setMic(p.mic ?? null); if (!p.mic) setError(`Presetet "${p.name}" saknar mikrofontyp. Välj Dynamisk eller Kondensator.`); setPresetName(p.name); setPresetLabel(p.label || ""); }}>{p.name}{p.label ? ` · ${p.label}` : ""}</button></li>)}</ul>
+        <ul className="st-presets">{presets.map(p => <li key={p.name}><button className="ab-secondary" title={`${p.label || ""} ${p.declick}/EQ ${eqText(p.eq)}/${p.mic ?? "mic saknas"}`} onClick={() => { setDeclick(p.declick); setEq(clampEq(p.eq)); setMic(p.mic ?? null); if (!p.mic) setError(`Presetet "${p.name}" saknar mikrofontyp. Välj Dynamisk eller Kondensator.`); setPresetName(p.name); setPresetLabel(p.label || ""); }}>{p.name}{p.label ? ` · ${p.label}` : ""}</button></li>)}</ul>
       </div>
       <div className="st-panel"><p className="ab-eyebrow">03 · MASTRA HELA FILEN</p><p>Samma automatiska kedja och dina val körs på hela filen. Exporten blir 44,1 kHz, 16 bit mono med dither.</p>
         <div className="st-row"><button className="ab-master" disabled={masterState?.state === "running" || !mic} onClick={() => fullInput.current?.click()}>Välj hela filen och mastra</button><button className="ab-secondary" disabled={masterState?.state === "running" || !mic} onClick={() => void masterFile(file)} >Mastra den här filen</button></div>

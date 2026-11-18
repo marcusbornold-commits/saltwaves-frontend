@@ -4,6 +4,7 @@ export type Params = {
   hpf: number;
   low: { f: number; g: number };
   mid: { f: number; g: number; q: number };
+  mid2?: { f: number; g: number; q: number }; // andra peak-bandet (kundens EQ); saknas = 0 dB
   high: { f: number; g: number };
   comp: { on: boolean; threshold: number; ratio: number; attack: number; release: number; knee: number };
   deess: { on: boolean; freq: number; threshold: number; ratio: number };
@@ -12,6 +13,47 @@ export type Params = {
   dfn: boolean;
 };
 export type Spec = { id: string; label: string; metric: "lufs" | "rms"; target: number; tolerance?: number; range?: [number, number]; peak_kind: "tp" | "sample"; peak_max: number; noise_max: number; note?: string; source?: string };
+
+// ---- Kundens EQ (ersätter klang 2026-10-17) ----
+// Måste matcha EQ_BANDS/EQ_MAX_DB i backend/studio_engine.py (saltwaves-audiobook). Servern klampar likadant.
+export type EqBand = "low" | "lm" | "hm" | "high";
+export type Eq = Record<EqBand, { f: number; g: number }>;
+export const EQ_MAX_DB = 3;
+export const EQ_BANDS: { id: EqBand; type: "lowshelf" | "peaking" | "highshelf"; label: string; f: number; min: number; max: number; q: number }[] = [
+  { id: "low", type: "lowshelf", label: "Bas", f: 120, min: 60, max: 250, q: 1 },
+  { id: "lm", type: "peaking", label: "Kropp", f: 400, min: 200, max: 1000, q: 1 },
+  { id: "hm", type: "peaking", label: "Närvaro", f: 2500, min: 1200, max: 5000, q: 1 },
+  { id: "high", type: "highshelf", label: "Luft", f: 8000, min: 4000, max: 12000, q: 1 },
+];
+export const eqNeutral = (): Eq => Object.fromEntries(EQ_BANDS.map(b => [b.id, { f: b.f, g: 0 }])) as Eq;
+export function clampEq(eq?: Partial<Record<EqBand, { f?: number; g?: number }>> | null): Eq {
+  const out = eqNeutral();
+  for (const b of EQ_BANDS) {
+    const v = eq?.[b.id]; if (!v) continue;
+    const f = Number(v.f ?? b.f), g = Number(v.g ?? 0); if (!Number.isFinite(f) || !Number.isFinite(g)) continue;
+    out[b.id] = { f: Math.round(Math.min(b.max, Math.max(b.min, f))), g: Math.round(Math.min(EQ_MAX_DB, Math.max(-EQ_MAX_DB, g)) * 10) / 10 };
+  }
+  return out;
+}
+/** Låst kundkedja i webbläsaren: bara EQ:n (resten är redan förrenderat på servern). */
+export const eqParams = (eq: Eq): Params => {
+  const e = clampEq(eq);
+  return { hpf: 0, low: e.low, mid: { ...e.lm, q: 1 }, mid2: { ...e.hm, q: 1 }, high: e.high, comp: { on: false, threshold: -24, ratio: 2.5, attack: 10, release: 150, knee: 4 }, deess: { on: false, freq: 6000, threshold: -32, ratio: 4 }, limiter: { ceiling: -3.5 }, declick: false, dfn: true };
+};
+/** Magnitud (dB) för ett RBJ-biquadband vid frekvens f (samma formler som Web Audio och ffmpeg; shelf S=1). */
+export function bandDb(type: "lowshelf" | "peaking" | "highshelf", f0: number, gain: number, q: number, f: number, sr = 48000) {
+  const A = Math.pow(10, gain / 40), w0 = 2 * Math.PI * f0 / sr, cw = Math.cos(w0), sw = Math.sin(w0);
+  let b0, b1, b2, a0, a1, a2;
+  if (type === "peaking") { const al = sw / (2 * q); b0 = 1 + al * A; b1 = -2 * cw; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * cw; a2 = 1 - al / A; }
+  else {
+    const al = sw / 2 * Math.SQRT2, sA = 2 * Math.sqrt(A) * al;
+    if (type === "lowshelf") { b0 = A * ((A + 1) - (A - 1) * cw + sA); b1 = 2 * A * ((A - 1) - (A + 1) * cw); b2 = A * ((A + 1) - (A - 1) * cw - sA); a0 = (A + 1) + (A - 1) * cw + sA; a1 = -2 * ((A - 1) + (A + 1) * cw); a2 = (A + 1) + (A - 1) * cw - sA; }
+    else { b0 = A * ((A + 1) + (A - 1) * cw + sA); b1 = -2 * A * ((A - 1) + (A + 1) * cw); b2 = A * ((A + 1) + (A - 1) * cw - sA); a0 = (A + 1) - (A - 1) * cw + sA; a1 = 2 * ((A - 1) - (A + 1) * cw); a2 = (A + 1) - (A - 1) * cw - sA; }
+  }
+  const w = 2 * Math.PI * f / sr, c1 = Math.cos(w), s1 = Math.sin(w), c2 = Math.cos(2 * w), s2 = Math.sin(2 * w);
+  const nr = b0 + b1 * c1 + b2 * c2, ni = -(b1 * s1 + b2 * s2), dr = a0 + a1 * c1 + a2 * c2, di = -(a1 * s1 + a2 * s2);
+  return 10 * Math.log10((nr * nr + ni * ni) / (dr * dr + di * di));
+}
 
 const BUTTERWORTH_DB = -3.0103; // Web Audio: Q för low/highpass anges i dB
 const PREDELAY = 0.006; // DynamicsCompressor lookahead i Chrome/Safari
@@ -37,6 +79,7 @@ export function buildChain(ctx: BaseAudioContext, p: Params, autoGainDb: number,
   const hpf = ctx.createBiquadFilter(); hpf.type = "highpass"; hpf.Q.value = BUTTERWORTH_DB;
   const low = ctx.createBiquadFilter(); low.type = "lowshelf";
   const mid = ctx.createBiquadFilter(); mid.type = "peaking";
+  const mid2 = ctx.createBiquadFilter(); mid2.type = "peaking";
   const high = ctx.createBiquadFilter(); high.type = "highshelf";
   const comp = ctx.createDynamicsCompressor(); const compMakeup = ctx.createGain();
   const compBypass = ctx.createGain(); const compWet = ctx.createGain();
@@ -47,7 +90,7 @@ export function buildChain(ctx: BaseAudioContext, p: Params, autoGainDb: number,
   const de = ctx.createDynamicsCompressor(); de.attack.value = 0.001; de.release.value = 0.06; de.knee.value = 2;
   const deMakeup = ctx.createGain(); const deWet = ctx.createGain(); const deBypass = ctx.createGain();
   const preLimiter = ctx.createGain(); const autoGain = ctx.createGain();
-  input.connect(hpf).connect(low).connect(mid).connect(high);
+  input.connect(hpf).connect(low).connect(mid).connect(mid2).connect(high);
   high.connect(comp).connect(compMakeup).connect(compWet).connect(deIn);
   high.connect(compBypass).connect(deIn);
   deIn.connect(lp).connect(lpDelay).connect(deWet);
@@ -62,6 +105,7 @@ export function buildChain(ctx: BaseAudioContext, p: Params, autoGainDb: number,
     hpf.frequency.value = q.hpf > 0 ? q.hpf : 1;
     low.frequency.value = q.low.f; low.gain.value = q.low.g;
     mid.frequency.value = q.mid.f; mid.gain.value = q.mid.g; mid.Q.value = q.mid.q;
+    mid2.frequency.value = q.mid2?.f ?? 2500; mid2.gain.value = q.mid2?.g ?? 0; mid2.Q.value = q.mid2?.q ?? 1;
     high.frequency.value = q.high.f; high.gain.value = q.high.g;
     comp.threshold.value = q.comp.threshold; comp.ratio.value = q.comp.ratio; comp.attack.value = q.comp.attack / 1000; comp.release.value = q.comp.release / 1000; comp.knee.value = q.comp.knee;
     compMakeup.gain.value = dbToLin(-compMakeupDb(q.comp.threshold, q.comp.ratio));
@@ -207,7 +251,7 @@ export function alimiterOffline(x: Float32Array | Float64Array, sr: number, limi
   return y;
 }
 
-/** Förutsäger mastern med serverns låsta slutsteg (backend finalize): kedja (klang) -> gain -> pausexpander (48 kHz)
+/** Förutsäger mastern med serverns låsta slutsteg (backend finalize): kedja (kundens EQ) -> gain -> pausexpander (48 kHz)
  *  -> 192 kHz -> alimiter (exakt port) -> mätning. Iterera gain som servern tills nivån ligger inom 0,03 LU.
  *  Pausbruset mäts efter expandern och läggs ihop med 16-bitars TPDF-dither (≈ −95 dBFS), som serverns slutfil. */
 const DITHER_DB = -95.1;
