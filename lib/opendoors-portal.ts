@@ -5,7 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { logEvent, notifyEpisodeDone } from "@/lib/opendoors-events";
 
 export const BUCKET = "audiobook-private";
-export const TENANT = "opendoors";
+// Test copies set OPENDOORS_TENANT so their rows never show up in the real list. Live leaves it unset.
+export const TENANT = process.env.OPENDOORS_TENANT || "opendoors";
 export const RETENTION_DAYS = 30;
 export const MAX_BYTES = 1000 * 1024 * 1024;
 export const EXTS = new Set(["wav", "mp3", "m4a", "flac"]);
@@ -50,7 +51,7 @@ export async function signed(path: string, seconds = 3600) {
   return data.signedUrl;
 }
 
-export async function uploadLocalFromApi(episodeId: string, name: "master.wav" | "master.mp3" | "raw.wav" | "raw.mp3" | "analysis.json") {
+export async function uploadLocalFromApi(episodeId: string, name: "master.wav" | "master.mp3" | "raw.wav" | "raw.mp3" | "analysis.json" | `stem_${number}.wav`) {
   const r = await backend(`episodes/${episodeId}/files/${name}`, undefined, 3600_000);
   if (!r.ok || !r.body) throw new Error("file");
   const { url, key } = env();
@@ -63,7 +64,13 @@ export async function uploadLocalFromApi(episodeId: string, name: "master.wav" |
   return storagePath;
 }
 
+export type StemInfo = { index: number; file: string; name: string; pan: number; room: boolean };
+export type MixSettings = { eq?: Record<string, { f: number; g: number }>; pans?: number[]; stems?: StemInfo[]; stem_gain_db?: number };
+export const stemPath = (episodeId: string, file: string) => `${PREFIX}/${episodeId}/${file}`;
+export const STEM_FILE = /^stem_\d{2}\.wav$/;
+
 export type Analysis = {
+  settings?: MixSettings;
   target_lufs?: number;
   target_tp?: number;
   mode?: string;

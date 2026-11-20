@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import {
   RETENTION_DAYS, TENANT, backend, db, fail, isUuid, noStore, signed, tusGrant, tusPathOk,
-  markDelivered, markFailed, uploadLocalFromApi, type Analysis,
+  markDelivered, markFailed, uploadLocalFromApi, stemPath, STEM_FILE, type Analysis,
 } from "@/lib/opendoors-portal";
+import { clampEq, clampPan } from "@/lib/opendoors-eq";
 import { logEvent, whoFrom } from "@/lib/opendoors-events";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ async function tracksOf(id: string) {
   return data || [];
 }
 
-const pubEp = (e: Record<string, unknown>, tracks?: unknown[], urls?: Record<string, string | null>) => ({
+const pubEp = (e: Record<string, unknown>, tracks?: unknown[], urls?: Record<string, unknown>) => ({
   id: e.id,
   title: e.title,
   show_name: e.show_name,
@@ -35,15 +36,22 @@ const pubEp = (e: Record<string, unknown>, tracks?: unknown[], urls?: Record<str
   files: urls,
 });
 
-async function fileUrls(e: { storage_path_wav: string | null; storage_path_mp3: string | null; storage_path_raw: string | null }) {
+async function fileUrls(e: { id: string; storage_path_wav: string | null; storage_path_mp3: string | null; storage_path_raw: string | null; analysis?: Analysis | null }) {
   const one = async (p: string | null) => (p ? signed(p).catch(() => null) : null);
   // raw.mp3 lives next to raw.wav
   const rawMp3 = e.storage_path_raw ? e.storage_path_raw.replace(/raw\.wav$/, "raw.mp3") : null;
+  // Per-track downloads: stems listed in analysis.settings.stems, stored next to the master.
+  const stems: { index: number; name: string; url: string | null }[] = [];
+  for (const st of e.analysis?.settings?.stems || []) {
+    if (!STEM_FILE.test(st.file)) continue;
+    stems.push({ index: st.index, name: st.name, url: await one(stemPath(e.id, st.file)) });
+  }
   return {
     master_wav: await one(e.storage_path_wav),
     master_mp3: await one(e.storage_path_mp3),
     raw_wav: await one(e.storage_path_raw),
     raw_mp3: await one(rawMp3),
+    stems,
   };
 }
 
@@ -66,6 +74,9 @@ async function finishIfReady(id: string) {
       const a = await backend(`episodes/${id}/files/analysis.json`, undefined, 30000);
       if (a.ok) analysis = await a.json();
     } catch { /* */ }
+    for (const st of analysis?.settings?.stems || []) {
+      if (STEM_FILE.test(st.file)) await uploadLocalFromApi(id, st.file as `stem_${number}.wav`).catch(() => undefined);
+    }
     await markDelivered(id, { wav, mp3, raw }, analysis);
     void logEvent("server", "done", id);
   }
@@ -87,6 +98,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
       const title = str(x.title, 200);
       if (!title) return fail("Ange en titel för avsnittet.");
       const { data, error } = await sb.from("opendoors_episodes").insert({
+        tenant: TENANT,
         title,
         show_name: str(x.show_name, 200) || "Motljus",
         notify_email: str(x.notify_email, 200) || null,
@@ -139,16 +151,22 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     if (p.length === 3 && p[0] === "episodes" && isUuid(p[1]) && p[2] === "start" && m === "POST") {
       const e = await episode(p[1]);
       if (!e) return fail("Avsnittet hittades inte.", 404);
+      if (e.status === "processing") return fail("Avsnittet mastras redan. Vänta tills det är klart.", 409);
       const tracks = await tracksOf(e.id);
-      if (tracks.length < 2) return fail("Ladda upp minst två spår, ett per mikrofon eller talare.");
+      if (tracks.length < 1) return fail("Ladda upp minst ett spår.");
+      // Panorering och EQ följer med anropet (ingen ny kolumn). Servern klampar: pan −100..100, EQ ±3 dB per band.
+      const x = await body();
+      const pans: unknown[] = Array.isArray(x.pans) ? x.pans : [];
       const payload = {
         mode: "standard_v2",
-        tracks: tracks.map(t => ({
+        eq: clampEq(x.eq),
+        tracks: tracks.map((t, i) => ({
           name: t.name,
           mic: t.mic_type,
           filename: t.original_filename,
           room: t.is_room,
           storage_path: t.storage_path || t.tus_path,
+          pan: clampPan(pans[i]),
         })),
       };
       const r = await backend(`episodes/${e.id}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
@@ -158,7 +176,7 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
       }
       const d = await r.json();
       await sb.from("opendoors_episodes").update({ status: "processing", backend_job: d.job_id || null, error: null, updated_at: new Date().toISOString() }).eq("id", e.id);
-      void logEvent(who, "start", e.id, { tracks: tracks.length });
+      void logEvent(who, "start", e.id, { tracks: tracks.length, rerun: e.status === "done" || e.status === "failed" });
       return Response.json({ ok: true, job: d.job_id }, { headers: noStore });
     }
     if (p.length === 4 && p[0] === "episodes" && isUuid(p[1]) && p[2] === "files" && m === "GET") {
